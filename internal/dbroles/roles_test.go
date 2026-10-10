@@ -17,15 +17,34 @@ var server *testpg.Server
 
 func TestMain(m *testing.M) { os.Exit(testpg.Main(m, &server)) }
 
-// prepare returns an admin connection to a fresh database on a server that has rds_iam, as RDS does.
+// rdsMaster mimics the RDS master user: CREATEROLE and owner of the database, but not a superuser,
+// with rds_iam grantable (on RDS through rds_superuser). Running Ensure as this role catches
+// statements that only work for a real superuser, which the container's default user is.
+const rdsMaster = "rds_master_test"
+
+// prepare returns a connection to a fresh database, acting as rdsMaster, after running Ensure.
 func prepare(t *testing.T) *pgx.Conn {
 	t.Helper()
-	conn := server.Connect(t, server.NewDatabase(t))
-	if _, err := conn.Exec(t.Context(), `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rds_iam') THEN CREATE ROLE rds_iam; END IF; END $$`); err != nil {
-		t.Fatalf("create rds_iam: %v", err)
+	db := server.NewDatabase(t)
+	conn := server.Connect(t, db)
+	setup := []string{
+		`DO $$ BEGIN
+		   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rds_iam') THEN CREATE ROLE rds_iam; END IF;
+		   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '` + rdsMaster + `') THEN
+		     CREATE ROLE ` + rdsMaster + ` CREATEROLE NOSUPERUSER;
+		   END IF;
+		 END $$`,
+		`GRANT rds_iam TO ` + rdsMaster + ` WITH ADMIN OPTION`,
+		`ALTER DATABASE ` + pgx.Identifier{db}.Sanitize() + ` OWNER TO ` + rdsMaster,
+		`SET ROLE ` + rdsMaster,
+	}
+	for _, sql := range setup {
+		if _, err := conn.Exec(t.Context(), sql); err != nil {
+			t.Fatalf("setup %q: %v", sql, err)
+		}
 	}
 	if err := dbroles.Ensure(t.Context(), conn); err != nil {
-		t.Fatalf("Ensure: %v", err)
+		t.Fatalf("Ensure as a non-superuser RDS-like master: %v", err)
 	}
 	return conn
 }
@@ -78,6 +97,17 @@ func TestEnsure_RolesLogInThroughIAMWithoutSuperpowers(t *testing.T) {
 		if !strings.Contains(snapshot, want) {
 			t.Errorf("missing %q in:\n%s", want, snapshot)
 		}
+	}
+}
+
+func TestEnsure_MasterKeepsNoMembershipInMigrator(t *testing.T) {
+	conn := prepare(t)
+	var member bool
+	if err := conn.QueryRow(t.Context(), `SELECT pg_has_role(current_user, 'migrator', 'USAGE')`).Scan(&member); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if member {
+		t.Error("the master still has the privileges of migrator after Ensure; the temporary grant must be revoked")
 	}
 }
 
