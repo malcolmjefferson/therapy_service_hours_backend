@@ -39,8 +39,14 @@ var statements = []string{
 	`GRANT USAGE ON SCHEMA public TO app_rw`,
 	// Tables and sequences that migrator creates are readable and writable by app_rw, never
 	// alterable or droppable. Append-only audit tables tighten this in their own migration (ARC-23).
+	// ALTER DEFAULT PRIVILEGES FOR ROLE needs privileges of that role. The RDS master is not a
+	// superuser, and since PostgreSQL 16 creating a role grants only ADMIN OPTION on it, not
+	// membership. So the master joins migrator just for these two statements and leaves again,
+	// all inside the one transaction.
+	`GRANT migrator TO CURRENT_USER WITH INHERIT TRUE, SET FALSE`,
 	`ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw`,
 	`ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_rw`,
+	`REVOKE migrator FROM CURRENT_USER`,
 }
 
 // Execer runs a statement. *pgxpool.Pool, *pgx.Conn and pgx.Tx satisfy it.
