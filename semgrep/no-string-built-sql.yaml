@@ -13,22 +13,23 @@ rules:
           - pattern: $DB.$METHOD($CTX, fmt.Sprintf(...), ...)
           - pattern: $DB.$METHOD($CTX, $X + $Y, ...)
           - pattern: $DB.$METHOD($CTX, $B.String(), ...)
-          - pattern: |
-              $Q := fmt.Sprintf(...)
-              ...
-              $DB.$METHOD($CTX, $Q, ...)
-          - pattern: |
-              $Q := $X + $Y
-              ...
-              $DB.$METHOD($CTX, $Q, ...)
-          - pattern: |
-              $Q = $Q + $Y
-              ...
-              $DB.$METHOD($CTX, $Q, ...)
-          - pattern: |
-              $Q += $Y
-              ...
-              $DB.$METHOD($CTX, $Q, ...)
+          # A variable built from strings earlier, then passed to the call. pattern-inside keeps the
+          # finding on the call line rather than the assignment.
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      $Q := fmt.Sprintf(...)
+                      ...
+                  - pattern-inside: |
+                      $Q := $X + $Y
+                      ...
+                  - pattern-inside: |
+                      $Q += $Y
+                      ...
+                  - pattern-inside: |
+                      $Q = $Q + $Y
+                      ...
+              - pattern: $DB.$METHOD($CTX, $Q, ...)
       # Two string literals joined at compile time are still static SQL.
       - pattern-not: $DB.$METHOD($CTX, "..." + "...", ...)
       - metavariable-regex:
