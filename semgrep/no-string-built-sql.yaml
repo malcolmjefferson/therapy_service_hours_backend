@@ -1,0 +1,37 @@
+# SEC-20/SEC-22, CLAUDE.md §11.1: SQL is static and parameterized. Queries come from sqlc;
+# no request, token, file or environment value is ever formatted or concatenated into SQL.
+# Tested by no-string-built-sql.go in this folder (`semgrep --test semgrep/`).
+rules:
+  - id: no-string-built-sql
+    languages: [go]
+    severity: ERROR
+    message: >-
+      SQL built from strings (fmt.Sprintf, +, or strings.Builder) is passed to $METHOD. Use a static
+      query from db/queries via sqlc with bound parameters (SEC-20, SEC-22, CLAUDE.md §11.1).
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$METHOD($CTX, fmt.Sprintf(...), ...)
+          - pattern: $DB.$METHOD($CTX, $X + $Y, ...)
+          - pattern: $DB.$METHOD($CTX, $B.String(), ...)
+          # A variable built from strings earlier, then passed to the call. pattern-inside keeps the
+          # finding on the call line rather than the assignment.
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      $Q := fmt.Sprintf(...)
+                      ...
+                  - pattern-inside: |
+                      $Q := $X + $Y
+                      ...
+                  - pattern-inside: |
+                      $Q += $Y
+                      ...
+                  - pattern-inside: |
+                      $Q = $Q + $Y
+                      ...
+              - pattern: $DB.$METHOD($CTX, $Q, ...)
+      # Two string literals joined at compile time are still static SQL.
+      - pattern-not: $DB.$METHOD($CTX, "..." + "...", ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(Exec|Query|QueryRow|Prepare|ExecContext|QueryContext|QueryRowContext|PrepareContext)$
