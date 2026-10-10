@@ -17,7 +17,7 @@
 | S0-02 | Apply accepted decisions: CLAUDE.md updated for ADR-0001 to ADR-0006 | done | [backend #6](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/6) | Also records public repos and GitHub Actions PR gates |
 | S0-03 | Backend skeleton: Go module, chi router, /healthz, slog, request IDs | done | [backend #2](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/2) |  |
 | S0-04 | OpenAPI v0 with oapi-codegen, spectral and oasdiff in backend CI | done | [backend #3](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/3) |  |
-| S0-08 | Database role bootstrap custom resource (app_rw, migrator, rds_iam) | done | [backend #8](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/8) | Runs with the dev data-stack deploy |
+| S0-08 | Database role bootstrap custom resource (app_rw, migrator, rds_iam) | in review | [backend #8](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/8), fix: backend PR (this one) | First dev deploy failed (dynamic reference not resolved in custom resources); fixed by the deploy-time provider (ADR-0001 amendment) |
 | S0-09 | Backend DB package: pgx pool with IAM token refresh and TLS | done | [backend #4](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/4) |  |
 | S0-10 | Migrate Lambda with embedded goose and baseline migration | done | [backend #7](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/7) | Invoked by the pipeline from S0-15 |
 | S0-17 | CI security and quality gates | done | [backend #5](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/5) | Dependabot ignore rules for held-back majors: frontend #10, infra #9 (in review) |

@@ -210,3 +210,34 @@ func TestIntegration_WithTx(t *testing.T) {
 		}
 	})
 }
+
+// TestIntegration_PasswordWithSpecialCharactersConnects guards against building connection strings:
+// the master password RDS generates may contain any of these characters (S0-08 regression).
+func TestIntegration_PasswordWithSpecialCharactersConnects(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := t.Context()
+	const role = "special_pw_probe"
+	const password = `p@ss:w/rd?#% x'"\;&=+`
+
+	// Role DDL cannot take bound parameters; format() with %I/%L quotes them inside the server.
+	var ddl string
+	if err := pool.QueryRow(ctx, "SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', $1::text, $2::text)", role, password).Scan(&ddl); err != nil {
+		t.Fatalf("format DDL: %v", err)
+	}
+	if _, err := pool.Exec(ctx, ddl); err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.WithoutCancel(ctx), "DROP ROLE IF EXISTS special_pw_probe") })
+
+	s := container.settings
+	s.User, s.Password = role, password
+	special, err := Open(ctx, s, nil)
+	if err != nil {
+		t.Fatalf("connect with a special-character password: %v", err)
+	}
+	defer special.Close()
+	var who string
+	if err := special.QueryRow(ctx, "SELECT current_user").Scan(&who); err != nil || who != role {
+		t.Errorf("current_user = %q, %v", who, err)
+	}
+}
