@@ -20,6 +20,26 @@ Go API (AWS Lambda), migrations, SQL queries and the **OpenAPI contract** (`api/
 
    The pre-commit hook scans staged changes for secrets and **blocks the commit** if gitleaks is missing.
 
+## Commands
+
+Requires Go 1.27 (pinned in `go.mod`).
+
+| Command | What it does |
+|---|---|
+| `go test ./...` | Unit tests (CI adds `-race`, which needs a C compiler on Windows) |
+| `go vet ./...` | Static checks |
+| `APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 go run ./cmd/api` | Serve the API locally; then open `http://127.0.0.1:8080/api/v1/healthz` |
+| `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bootstrap ./cmd/api` | Build the Lambda binary (`provided.al2023`, arm64) |
+
+## Configuration (environment variables, set by CDK)
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `APP_VERSION` | Yes | Build identifier reported by `/api/v1/healthz` |
+| `LOG_LEVEL` | No (`info`) | `debug`, `info`, `warn` or `error` |
+| `MAX_BODY_BYTES` | No (1 MiB) | Largest accepted request body |
+| `LOCAL_HTTP_ADDR` | No | Local development only: serve plain HTTP instead of the Lambda runtime |
+
 ## Contributing
 
 - `main` is protected: changes go through a pull request with passing checks (ARC-49).
