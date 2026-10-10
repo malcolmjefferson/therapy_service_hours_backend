@@ -51,9 +51,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, err
 	}
 	r := newMux(deps)
-	r.Route(BasePath, func(api chi.Router) {
-		api.Get("/healthz", healthz(deps.Version))
-	})
+	mountAPI(r, &server{version: deps.Version})
 	return r, nil
 }
 
@@ -68,6 +66,7 @@ func newMux(deps RouterDeps) *chi.Mux {
 	r.Use(accessLog(deps.Logger, deps.Now))
 	r.Use(recoverPanics)
 	r.Use(limitBody(deps.MaxBodyBytes))
+	r.Use(apiHeaders)
 
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
 		writeProblem(w, req, Problem{Type: ProblemNotFound, Title: "Not Found", Status: http.StatusNotFound})

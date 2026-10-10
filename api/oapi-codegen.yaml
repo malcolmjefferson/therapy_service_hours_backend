@@ -1,0 +1,10 @@
+# oapi-codegen configuration (ADR-0006). Regenerate with `go generate ./...`; CI fails if the output is stale.
+package: gen
+output: api.gen.go
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
