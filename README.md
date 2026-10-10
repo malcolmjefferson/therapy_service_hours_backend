@@ -8,17 +8,31 @@ Go API (AWS Lambda), migrations, SQL queries and the **OpenAPI contract** (`api/
 - **Engineering standards** (rules block merges): [docs/standards/](docs/standards/README.md)
 - **Decisions:** [docs/adr/](docs/adr/README.md)
 - **Backlog:** [docs/jira/](docs/jira/README.md)
+- **Operations** (deploy, alarms, restore, adding a migration): [infra runbook](https://github.com/malcolmjefferson/therapy_service_hours_infra/blob/main/docs/runbook.md)
 
-## First-time setup
+## Quick start (new developer)
 
-1. Install [gitleaks](https://github.com/gitleaks/gitleaks) (secret scanning, SEC-61).
-2. Turn on the repo's git hooks once per clone:
+**Prerequisites**
 
-   ```bash
-   git config core.hooksPath .githooks
-   ```
+| Tool | Why |
+|---|---|
+| [Go](https://go.dev/dl/) 1.24 or later | Any recent Go works: `go.mod` pins the toolchain (1.27) and Go downloads it on first use (`GOTOOLCHAIN=auto`, the default) |
+| [Docker](https://docs.docker.com/get-docker/) (Desktop or Engine), running | Integration tests start PostgreSQL 17 with Testcontainers. Without Docker they **skip**; unit tests still run |
+| [gitleaks](https://github.com/gitleaks/gitleaks) | Secret scanning in the pre-commit hook (SEC-61) |
 
-   The pre-commit hook scans staged changes for secrets and **blocks the commit** if gitleaks is missing.
+**Steps**
+
+```bash
+git clone https://github.com/malcolmjefferson/therapy_service_hours_backend.git
+cd therapy_service_hours_backend
+git config core.hooksPath .githooks   # once per clone: the pre-commit hook blocks commits with secrets (and when gitleaks is missing)
+go test ./...                          # unit + integration tests; first run downloads the toolchain and the Postgres image
+APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 go run ./cmd/api
+```
+
+Then open http://127.0.0.1:8080/api/v1/healthz: `{"status":"ok","version":"local"}`. The frontend's dev server (`npm run dev`) proxies `/api` to this address.
+
+**Windows with Docker Desktop:** run `export TESTCONTAINERS_RYUK_DISABLED=true` (Git Bash) before `go test`, or the integration tests time out starting Testcontainers' Ryuk container.
 
 ## Commands
 
@@ -31,7 +45,20 @@ Requires Go 1.27 (pinned in `go.mod`).
 | `go generate ./...` | Regenerate `internal/http/gen` from `api/openapi.yaml` |
 | `scripts/check-generated.sh`, `scripts/check-spectral.sh`, `scripts/check-breaking.sh` | API contract gates; see [api/README.md](api/README.md) |
 | `APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 go run ./cmd/api` | Serve the API locally; then open `http://127.0.0.1:8080/api/v1/healthz` |
-| `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bootstrap ./cmd/api` | Build the Lambda binary (`provided.al2023`, arm64) |
+| `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bootstrap ./cmd/api` | Build one Lambda binary (`provided.al2023`, arm64) |
+
+## Build the Lambdas
+
+The pipeline builds every Lambda; a manual deploy (see the [runbook](https://github.com/malcolmjefferson/therapy_service_hours_infra/blob/main/docs/runbook.md#2-deploy-flow)) needs the same layout, which infra reads from `BACKEND_DIST`:
+
+```bash
+for c in api migrate dbbootstrap dbbootstrap-provider; do
+  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/$c/bootstrap" "./cmd/$c"
+done
+git rev-parse HEAD > dist/VERSION   # reported by /api/v1/healthz
+```
+
+Build from a clean checkout of `origin/main`.
 
 ## Configuration (environment variables, set by CDK)
 

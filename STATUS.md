@@ -5,7 +5,7 @@
 
 ## Summary (2026-10-10)
 
-- **Slice S0 (walking skeleton):** 8 done, 0 in review, 0 in progress, 1 not started (of 9 tickets touching this repo).
+- **Slice S0 (walking skeleton):** 8 done, 1 in review, 0 in progress, 0 not started (of 9 tickets touching this repo).
 - **AWS:** account bootstrapped for CDK in us-west-2 (CDKToolkit). First dev deploy of the data stack (VPC, RDS, database roles) is pending; nothing else is deployed.
 - **Next:** S0-11 (API) and S0-12 (web) constructs, then the pipeline (S0-14 to S0-16) and alerts and budget (S0-18).
 
@@ -21,6 +21,6 @@
 | S0-09 | Backend DB package: pgx pool with IAM token refresh and TLS | done | [backend #4](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/4) |  |
 | S0-10 | Migrate Lambda with embedded goose and baseline migration | done | [backend #7](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/7) | Invoked by the pipeline from S0-15 |
 | S0-17 | CI security and quality gates | done | [backend #5](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/5) | Dependabot ignore rules for held-back majors: frontend #10, infra #9 (in review) |
-| S0-21 | Runbook v0 and README per repo | not started | - |  |
+| S0-21 | Runbook v0 and README per repo | in review | backend PR (this one), infra and frontend PRs | New-developer quick start and the Lambda build; runbook lives in infra |
 
 Statuses: **not started**, **in progress**, **in review** (PR open), **done** (merged to main).
