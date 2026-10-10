@@ -1,0 +1,70 @@
+name: contract
+
+# API contract gates (ADR-0006): generated code is current, the spec passes the spectral ruleset,
+# and no breaking change slips in unless the PR carries the `breaking-change` label (ARC-14).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codegen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Generated code is up to date
+        run: scripts/check-generated.sh
+      - name: Contract tests
+        run: go test -run 'TestContract' ./internal/http/...
+
+  spectral:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Lint the spec and test the ruleset
+        run: scripts/check-spectral.sh
+
+  breaking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: The breaking-change check catches a removed endpoint
+        run: scripts/check-breaking.sh --self-test
+      - name: No breaking change against the base branch
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'breaking-change')
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if ! git cat-file -e "origin/${BASE_REF}:api/openapi.yaml" 2>/dev/null; then
+            echo "::notice::origin/${BASE_REF} has no api/openapi.yaml yet; nothing to compare."
+            exit 0
+          fi
+          git show "origin/${BASE_REF}:api/openapi.yaml" > "${RUNNER_TEMP}/base-openapi.yaml"
+          scripts/check-breaking.sh "${RUNNER_TEMP}/base-openapi.yaml"

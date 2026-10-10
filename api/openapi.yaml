@@ -1,0 +1,164 @@
+openapi: 3.1.0
+info:
+  title: Therapy Service Hours API
+  version: 0.1.0
+  summary: Contract between the SPA and the Go API (ADR-0006). This file is the source of truth.
+  description: |
+    Conventions every endpoint follows (see api/README.md for the full list):
+
+    - **Base path** `/api/v1`, JSON bodies, `snake_case` field names.
+    - **Errors** are RFC 7807 `application/problem+json` using the `Problem` schema. Clients branch on
+      `type`, which is a stable URN per error kind.
+    - **Pagination:** list endpoints take `page` (1-based) and `page_size` (default 50, maximum 200)
+      and return `items` plus a `page` object (`PageInfo`). Order is stable, with `id` as the tiebreaker.
+    - **Idempotency:** POST endpoints that create or bulk-change data take the `Idempotency-Key` header.
+      Repeating a key with the same body returns the original result; a different body returns 409.
+    - **Authentication:** every route requires a Cognito JWT except those that declare `security: []`.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: /api/v1
+security:
+  - cognitoJwt: []
+tags:
+  - name: system
+    description: Operational endpoints
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Report that the API is up and which build is running
+      description: Public and cheap. It touches no user data (GO-67).
+      security: []
+      responses:
+        '200':
+          description: The API is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    cognitoJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito access token, validated by the API Gateway JWT authorizer (SEC-03).
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100000
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      description: Items per page (GO-56, ARC-16).
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 200
+        default: 50
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Client-generated key, one per user action and reused on retry (GO-57, FE-34).
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
+  responses:
+    Problem:
+      description: An error, as RFC 7807 problem details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+          description: Build identifier, for example the backend commit SHA.
+          maxLength: 64
+    Problem:
+      type: object
+      description: RFC 7807 problem details.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          maxLength: 200
+          description: Stable URN for the error kind, for example `urn:therapy-service-hours:problem:not-found`.
+          examples: ['urn:therapy-service-hours:problem:not-found']
+        title:
+          type: string
+          maxLength: 200
+        status:
+          type: integer
+          format: int32
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          maxLength: 2000
+        request_id:
+          type: string
+          maxLength: 64
+          description: Quote this when reporting a problem; it matches the server logs.
+        errors:
+          type: array
+          maxItems: 100
+          description: Invalid fields, for validation problems only.
+          items:
+            $ref: '#/components/schemas/ProblemField'
+    ProblemField:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          maxLength: 100
+        message:
+          type: string
+          maxLength: 500
+    PageInfo:
+      type: object
+      description: Pagination metadata returned by every list endpoint.
+      additionalProperties: false
+      required: [page, page_size, total_items]
+      properties:
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        page_size:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 200
+        total_items:
+          type: integer
+          format: int64
+          minimum: 0
