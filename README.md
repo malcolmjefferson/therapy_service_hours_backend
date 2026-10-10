@@ -26,7 +26,7 @@ Requires Go 1.27 (pinned in `go.mod`).
 
 | Command | What it does |
 |---|---|
-| `go test ./...` | Unit tests (CI adds `-race`, which needs a C compiler on Windows) |
+| `go test ./...` | Unit and integration tests. Integration tests start Postgres with Testcontainers and **skip when Docker is not running**. On Docker Desktop for Windows set `TESTCONTAINERS_RYUK_DISABLED=true`. CI adds `-race`. |
 | `go vet ./...` | Static checks |
 | `go generate ./...` | Regenerate `internal/http/gen` from `api/openapi.yaml` |
 | `scripts/check-generated.sh`, `scripts/check-spectral.sh`, `scripts/check-breaking.sh` | API contract gates; see [api/README.md](api/README.md) |
