@@ -58,7 +58,10 @@ func (h *handler) handle(ctx context.Context, event cfn.Event) (string, map[stri
 	if err != nil {
 		return physicalID, nil, err //nolint:wrapcheck // The message lists the missing properties.
 	}
-	roles, err := h.provider.Ensure(ctx, props)
+	// Stop waiting for the worker before this Lambda times out, so CloudFormation always gets a response.
+	ensureCtx, cancel := rolebootstrap.WithResponseMargin(ctx, rolebootstrap.ResponseMargin)
+	defer cancel()
+	roles, err := h.provider.Ensure(ensureCtx, props)
 	if err != nil {
 		h.logger.Error("db role bootstrap provider failed", slog.String("error", err.Error()))
 		return physicalID, nil, err //nolint:wrapcheck // Ensure wraps with context.

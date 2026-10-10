@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/db"
@@ -21,7 +22,9 @@ type handler struct {
 func (h *handler) handle(ctx context.Context, req rolebootstrap.Request) (rolebootstrap.Response, error) {
 	h.logger.Info("db role bootstrap", slog.Any("request", req)) // LogValue omits the password.
 	if err := req.Validate(); err != nil {
-		return rolebootstrap.Response{}, err //nolint:wrapcheck // Validate's message is complete.
+		// An empty request usually means CloudFormation invoked the worker directly: the custom
+		// resource must point at dbbootstrap-provider instead.
+		return rolebootstrap.Response{}, fmt.Errorf("%w (the worker must be invoked by dbbootstrap-provider, not by CloudFormation)", err)
 	}
 	settings := db.Settings{
 		Host: req.Host, Port: req.Port, Database: req.Database, User: req.Username,
