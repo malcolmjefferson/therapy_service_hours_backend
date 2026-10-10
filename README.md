@@ -49,6 +49,20 @@ Requires Go 1.27 (pinned in `go.mod`).
 - Destructive statements (`DROP`, `ALTER ... DROP`, `TRUNCATE`, `RENAME`) are allowed only in a file with a `-- +contract` line; `scripts/check-migrations.sh` enforces this in CI.
 - Local run against a container: `DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=app DB_USER=app DB_AUTH=password DB_PASSWORD=... go run ./cmd/migrate` (invokes need a Lambda runtime; tests call `internal/migrate` directly).
 
+## CI gates (`.github/workflows/ci.yml`)
+
+Every PR runs these in parallel; any failure blocks the merge:
+
+| Job | Checks |
+|---|---|
+| `lint` | golangci-lint v2 (`.golangci.yml`): errcheck, govet, staticcheck, gosec (incl. G201/G202 string-built SQL), revive, gocritic, errorlint, wrapcheck on adapters, depguard layer rules (GO-01, GO-02), cyclop 15, gofmt, goimports |
+| `test` | `go mod verify`, then `go test -race` including Testcontainers integration tests |
+| `vuln` | `govulncheck` (the toolchain is pinned in `go.mod`; bump it when the standard library gets a fix) |
+| `semgrep` | `semgrep/no-string-built-sql.yaml` forbids `fmt.Sprintf`, `+` or `strings.Builder` SQL in `Exec`/`Query`/`QueryRow`; `semgrep --test` proves the rule still catches its seeded fixture |
+| `sqlc` | `sqlc diff` once `sqlc.yaml` exists (S2) |
+
+Plus `contract.yml` (API contract, S0-04), `migrations.yml` (no untagged destructive SQL, S0-10) and `secret-scan.yml` (gitleaks). Dependabot opens weekly update PRs for Go modules and Actions.
+
 ## Contributing
 
 - `main` is protected: changes go through a pull request with passing checks (ARC-49).
