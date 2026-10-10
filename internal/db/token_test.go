@@ -190,6 +190,27 @@ func TestPoolConfig_IAMUsesVerifiedTLSAndTheLimits(t *testing.T) {
 	}
 }
 
+func TestPoolConfig_PasswordModeVerifiesTLSOnlyWhenAsked(t *testing.T) {
+	t.Parallel()
+	plain := Settings{Host: "localhost", Port: 5432, Database: "app", User: "app", Mode: AuthPassword, Password: "pw"}
+	cfg, err := poolConfig(plain, nil)
+	if err != nil || cfg.ConnConfig.TLSConfig != nil {
+		t.Fatalf("plain password mode should not use TLS: %v %+v", err, cfg.ConnConfig.TLSConfig)
+	}
+	verified := plain
+	verified.Host, verified.VerifyTLS = "db.example.internal", true
+	cfg, err = poolConfig(verified, nil)
+	if err != nil {
+		t.Fatalf("poolConfig: %v", err)
+	}
+	if tlsCfg := cfg.ConnConfig.TLSConfig; tlsCfg == nil || tlsCfg.ServerName != "db.example.internal" || tlsCfg.InsecureSkipVerify {
+		t.Errorf("VerifyTLS should give verify-full TLS, got %+v", tlsCfg)
+	}
+	if len(cfg.ConnConfig.Fallbacks) != 0 {
+		t.Error("fallbacks would allow a non-TLS connection")
+	}
+}
+
 func TestEmbeddedCABundle_ParsesIntoACertPool(t *testing.T) {
 	t.Parallel()
 	if _, err := verifiedTLS("db.example.internal"); err != nil {
