@@ -28,6 +28,8 @@ Requires Go 1.27 (pinned in `go.mod`).
 |---|---|
 | `go test ./...` | Unit tests (CI adds `-race`, which needs a C compiler on Windows) |
 | `go vet ./...` | Static checks |
+| `go generate ./...` | Regenerate `internal/http/gen` from `api/openapi.yaml` |
+| `scripts/check-generated.sh`, `scripts/check-spectral.sh`, `scripts/check-breaking.sh` | API contract gates; see [api/README.md](api/README.md) |
 | `APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 go run ./cmd/api` | Serve the API locally; then open `http://127.0.0.1:8080/api/v1/healthz` |
 | `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bootstrap ./cmd/api` | Build the Lambda binary (`provided.al2023`, arm64) |
 
