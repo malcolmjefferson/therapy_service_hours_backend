@@ -32,7 +32,8 @@ type AuthMode string
 const (
 	// AuthIAM signs an RDS IAM token per new connection and requires verified TLS. Used in AWS.
 	AuthIAM AuthMode = "iam"
-	// AuthPassword uses a static password without TLS. Only for local containers and tests.
+	// AuthPassword uses a static password. Without VerifyTLS it is only for local containers and
+	// tests; the role bootstrap uses it with VerifyTLS for the one-time master-user connection.
 	AuthPassword AuthMode = "password"
 )
 
@@ -47,6 +48,9 @@ type Settings struct {
 	Password string
 	// Region is the AWS region the IAM token is signed for. Used only in AuthIAM mode.
 	Region string
+	// VerifyTLS requires verify-full TLS against the RDS CA bundle in AuthPassword mode.
+	// AuthIAM always verifies.
+	VerifyTLS bool
 }
 
 // Endpoint returns host:port, the form RDS IAM tokens are signed for.
@@ -146,6 +150,13 @@ func poolConfig(s Settings, tokens *TokenSource) (*pgxpool.Config, error) {
 		}
 	case AuthPassword:
 		cc.TLSConfig = nil
+		if s.VerifyTLS {
+			tlsCfg, err := verifiedTLS(s.Host)
+			if err != nil {
+				return nil, err
+			}
+			cc.TLSConfig = tlsCfg
+		}
 		cc.Password = s.Password
 	}
 	return cfg, nil
