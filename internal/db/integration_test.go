@@ -105,7 +105,7 @@ func TestIntegration_ConnectionFailureIsATypedError(t *testing.T) {
 		t.Skip(container.skip)
 	}
 	// A port with nothing listening: reserve one, then close it.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
