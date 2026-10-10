@@ -23,7 +23,7 @@ import (
 // so the router can match test requests.
 func loadSpec(t *testing.T) *openapi3.T {
 	t.Helper()
-	spec, err := gen.GetSwagger()
+	spec, err := gen.GetSpec()
 	if err != nil {
 		t.Fatalf("load embedded spec: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestContract_ResponsesMatchTheSpec(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			req := httptest.NewRequest(tt.method, "http://example.test"+tt.path, nil)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, "http://example.test"+tt.path, nil)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
 			if rec.Code != tt.wantStatus {
