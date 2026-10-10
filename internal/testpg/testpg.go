@@ -94,13 +94,18 @@ func (s *Server) NewDatabase(t *testing.T) string {
 	name := "t_" + hex.EncodeToString(b[:])
 
 	admin := s.connect(t, "postgres_test")
-	// Identifiers cannot be bound parameters; name is generated above from hex only.
-	if _, err := admin.Exec(t.Context(), "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
+	// CREATE/DROP DATABASE take an identifier, which cannot be a bound parameter. This is test-only
+	// DDL on a name generated above from random hex and quoted by pgx.Identifier, so the SQL-building
+	// rule (SEC-22) does not apply. Application code never builds SQL this way.
+	ident := pgx.Identifier{name}.Sanitize()
+	// nosemgrep: no-string-built-sql
+	if _, err := admin.Exec(t.Context(), "CREATE DATABASE "+ident); err != nil {
 		t.Fatalf("create database: %v", err)
 	}
 	t.Cleanup(func() {
 		ctx := context.WithoutCancel(t.Context())
-		_, _ = admin.Exec(ctx, "DROP DATABASE IF EXISTS "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)")
+		// nosemgrep: no-string-built-sql
+		_, _ = admin.Exec(ctx, "DROP DATABASE IF EXISTS "+ident+" WITH (FORCE)")
 		_ = admin.Close(ctx)
 	})
 	return name
