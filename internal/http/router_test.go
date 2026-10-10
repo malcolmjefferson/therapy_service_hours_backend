@@ -20,7 +20,7 @@ func TestHealthz_ReturnsVersionAsUncachedJSON(t *testing.T) {
 		t.Fatalf("NewRouter: %v", err)
 	}
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil))
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/healthz", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -55,7 +55,7 @@ func TestRouter_UnknownAndWrongMethodReturnProblemJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.path, nil))
+			h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), tt.method, tt.path, nil))
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
@@ -104,7 +104,7 @@ func TestRequestID(t *testing.T) {
 				seen = RequestIDFrom(r.Context())
 				w.WriteHeader(http.StatusNoContent)
 			})
-			req := httptest.NewRequest(http.MethodGet, "/probe", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/probe", nil)
 			if tt.upstream != "" {
 				req = req.WithContext(ContextWithRequestID(req.Context(), tt.upstream))
 			}
@@ -137,7 +137,7 @@ func TestLogging_EveryLineIsJSONWithRequestIDAndFunction(t *testing.T) {
 	mux.Get("/panic", func(http.ResponseWriter, *http.Request) { panic("boom") })
 
 	for _, path := range []string{"/ok", "/fail", "/panic", "/missing"} {
-		mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+		mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
 	}
 
 	lines := sink.lines(t)
@@ -160,7 +160,7 @@ func TestAccessLog_RecordsRoutePatternNotRawPath(t *testing.T) {
 	mux := newMux(testDeps(sink))
 	mux.Get("/people/{name}", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 
-	mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/people/Pseudonym-A?search=Pseudonym-B", nil))
+	mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/people/Pseudonym-A?search=Pseudonym-B", nil))
 
 	lines := sink.lines(t)
 	access := lines[len(lines)-1]
@@ -183,7 +183,7 @@ func TestRecover_PanicReturnsProblem500AndLogsStack(t *testing.T) {
 	mux.Get("/panic", func(http.ResponseWriter, *http.Request) { panic("secret internal detail") })
 
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/panic", nil))
+	mux.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/panic", nil))
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
@@ -210,7 +210,7 @@ func TestRecover_PanicReturnsProblem500AndLogsStack(t *testing.T) {
 	if panicLine["level"] != "ERROR" || panicLine["panic"] != "secret internal detail" {
 		t.Errorf("panic line = %v", panicLine)
 	}
-	if stack, _ := panicLine["stack"].(string); !strings.Contains(stack, "recoverPanics") {
+	if stack, _ := panicLine["stack"].(string); !strings.Contains(stack, "recoverTo") {
 		t.Errorf("stack not logged: %q", stack)
 	}
 }
@@ -225,7 +225,7 @@ func TestRecover_ReraisesErrAbortHandler(t *testing.T) {
 			t.Errorf("recovered %v, want http.ErrAbortHandler", rec)
 		}
 	}()
-	mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/abort", nil))
+	mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/abort", nil))
 	t.Error("expected the abort panic to propagate")
 }
 
@@ -254,7 +254,7 @@ func TestLimitBody(t *testing.T) {
 			t.Parallel()
 			mux := newMux(testDeps(&logSink{}))
 			mux.Post("/echo", echo)
-			req := httptest.NewRequest(http.MethodPost, "/echo", strings.NewReader(tt.body))
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/echo", strings.NewReader(tt.body))
 			if tt.hideLength {
 				req.ContentLength = -1
 			}
@@ -308,7 +308,7 @@ func TestWriteError_LogsOnceAndHidesInternalText(t *testing.T) {
 		WriteError(w, r, errors.New("pq: relation users does not exist"))
 	})
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/fail", nil))
+	mux.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/fail", nil))
 
 	if strings.Contains(rec.Body.String(), "relation") {
 		t.Errorf("internal error text leaked to the client (GO-33): %s", rec.Body.String())
@@ -337,7 +337,7 @@ func TestWriteError_ValidationListsFields(t *testing.T) {
 		))
 	})
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/invalid", nil))
+	mux.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/invalid", nil))
 
 	p := decodeProblem(t, rec.Body.Bytes())
 	if rec.Code != http.StatusBadRequest || len(p.Errors) != 2 || p.Errors[1].Field != "end_time" {

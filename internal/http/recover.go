@@ -12,20 +12,24 @@ import (
 // because it is the standard way to abort a response on purpose.
 func recoverPanics(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			rec := recover()
-			if rec == nil {
-				return
-			}
-			if rec == http.ErrAbortHandler { //nolint:errorlint // recover() returns the exact sentinel value.
-				panic(rec)
-			}
-			LoggerFrom(r.Context()).LogAttrs(r.Context(), slog.LevelError, "panic recovered",
-				slog.String("panic", fmt.Sprint(rec)),
-				slog.String("stack", string(debug.Stack())),
-			)
-			writeProblem(w, r, Problem{Type: ProblemInternal, Title: "Internal Server Error", Status: http.StatusInternalServerError})
-		}()
+		defer recoverTo(w, r)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// recoverTo must be deferred directly so recover() sees the handler's panic.
+func recoverTo(w http.ResponseWriter, r *http.Request) {
+	rec := recover()
+	if rec == nil {
+		return
+	}
+	if rec == http.ErrAbortHandler { //nolint:errorlint // recover() returns the exact sentinel value.
+		panic(rec)
+	}
+	ctx := r.Context()
+	LoggerFrom(ctx).LogAttrs(ctx, slog.LevelError, "panic recovered",
+		slog.String("panic", fmt.Sprint(rec)),
+		slog.String("stack", string(debug.Stack())),
+	)
+	writeProblem(w, r, Problem{Type: ProblemInternal, Title: "Internal Server Error", Status: http.StatusInternalServerError})
 }
