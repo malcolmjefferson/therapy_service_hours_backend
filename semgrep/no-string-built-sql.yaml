@@ -1,6 +1,6 @@
 # SEC-20/SEC-22, CLAUDE.md §11.1: SQL is static and parameterized. Queries come from sqlc;
 # no request, token, file or environment value is ever formatted or concatenated into SQL.
-# Tested by no-string-built-sql.go in this folder (`semgrep --test .semgrep`).
+# Tested by no-string-built-sql.go in this folder (`semgrep --test semgrep/`).
 rules:
   - id: no-string-built-sql
     languages: [go]

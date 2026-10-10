@@ -1,6 +1,6 @@
 //go:build semgrep_fixture
 
-// Fixture for .semgrep/no-string-built-sql.yaml. Each `ruleid` line must be flagged and each `ok`
+// Fixture for semgrep/no-string-built-sql.yaml. Each `ruleid` line must be flagged and each `ok`
 // line must not. The build tag keeps it out of every real build.
 package fixture
 

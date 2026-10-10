@@ -49,7 +49,7 @@ Every PR runs these in parallel; any failure blocks the merge:
 | `lint` | golangci-lint v2 (`.golangci.yml`): errcheck, govet, staticcheck, gosec (incl. G201/G202 string-built SQL), revive, gocritic, errorlint, wrapcheck on adapters, depguard layer rules (GO-01, GO-02), cyclop 15, gofmt, goimports |
 | `test` | `go mod verify`, then `go test -race` including Testcontainers integration tests |
 | `vuln` | `govulncheck` (the toolchain is pinned in `go.mod`; bump it when the standard library gets a fix) |
-| `semgrep` | `.semgrep/no-string-built-sql.yaml` forbids `fmt.Sprintf`, `+` or `strings.Builder` SQL in `Exec`/`Query`/`QueryRow`; `semgrep --test` proves the rule still catches its seeded fixture |
+| `semgrep` | `semgrep/no-string-built-sql.yaml` forbids `fmt.Sprintf`, `+` or `strings.Builder` SQL in `Exec`/`Query`/`QueryRow`; `semgrep --test` proves the rule still catches its seeded fixture |
 | `sqlc` | `sqlc diff` once `sqlc.yaml` exists (S2) |
 
 Plus `contract.yml` (API contract, S0-04) and `secret-scan.yml` (gitleaks). Dependabot opens weekly update PRs for Go modules and Actions.

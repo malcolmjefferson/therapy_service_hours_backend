@@ -71,9 +71,12 @@ jobs:
       - name: Install Semgrep
         run: python3 -m pip install --disable-pip-version-check semgrep==1.180.0
       - name: The rule catches its seeded fixtures
-        run: semgrep --test .semgrep/
+        # Fails unless Semgrep actually found and passed the fixture: "No unit tests found" must not pass silently.
+        run: |
+          semgrep --test semgrep/ 2>&1 | tee "${RUNNER_TEMP}/semgrep-test.txt"
+          grep -q "All tests passed" "${RUNNER_TEMP}/semgrep-test.txt"
       - name: No string-built SQL in the code (SEC-22)
-        run: semgrep scan --config .semgrep/no-string-built-sql.yaml --error --metrics=off --exclude .semgrep .
+        run: semgrep scan --config semgrep/no-string-built-sql.yaml --error --metrics=off --exclude semgrep .
 
   sqlc:
     name: sqlc output is current
