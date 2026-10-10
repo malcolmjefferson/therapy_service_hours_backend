@@ -40,6 +40,13 @@ Requires Go 1.27 (pinned in `go.mod`).
 | `MAX_BODY_BYTES` | No (1 MiB) | Largest accepted request body |
 | `LOCAL_HTTP_ADDR` | No | Local development only: serve plain HTTP instead of the Lambda runtime |
 
+## Migrations (ADR-0003)
+
+- SQL files live in `db/migrations/` (goose format, `-- +goose Up` only; forward-only) and are embedded into the `migrate` Lambda (`cmd/migrate`).
+- The pipeline invokes `migrate` before each app deploy. It connects as the `migrator` role with an IAM token, takes a PostgreSQL advisory lock (a concurrent run waits, then finds nothing to do) and returns `{"status":"ok"|"error","applied":[...],"version":N,"error":"..."}`.
+- Destructive statements (`DROP`, `ALTER ... DROP`, `TRUNCATE`, `RENAME`) are allowed only in a file with a `-- +contract` line; `scripts/check-migrations.sh` enforces this in CI.
+- Local run against a container: `DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=app DB_USER=app DB_AUTH=password DB_PASSWORD=... go run ./cmd/migrate` (invokes need a Lambda runtime; tests call `internal/migrate` directly).
+
 ## Contributing
 
 - `main` is protected: changes go through a pull request with passing checks (ARC-49).
