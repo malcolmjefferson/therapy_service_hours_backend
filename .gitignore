@@ -1,0 +1,17 @@
+# Local environment and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Go build and test output
+/bin/
+/dist/
+*.zip
+*.test
+coverage.out
+coverage.html
