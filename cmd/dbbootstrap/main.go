@@ -1,7 +1,7 @@
-// Command dbbootstrap is the CloudFormation custom resource that creates the app_rw and migrator
-// roles (ADR-0001). It runs in the VPC as the RDS master user, once per deploy of the data stack.
-// No runtime Lambda reads the master secret: CloudFormation resolves it into this resource's
-// properties at deploy time.
+// Command dbbootstrap is the role-bootstrap worker (in the VPC, ADR-0001 as amended 2026-10-10).
+// The deploy-time provider Lambda invokes it directly with the master connection in the payload;
+// it creates the app_rw and migrator roles over verify-full TLS. It never reads Secrets Manager
+// and never logs the payload.
 package main
 
 import (
@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/db"
@@ -19,7 +18,7 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("function", "dbbootstrap"))
 	h := &handler{logger: logger, ensureRoles: ensureRoles}
-	lambda.Start(cfn.LambdaWrap(h.handle))
+	lambda.Start(h.handle)
 }
 
 func ensureRoles(ctx context.Context, s db.Settings) error {
