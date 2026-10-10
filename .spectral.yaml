@@ -1,0 +1,120 @@
+# Spectral ruleset for api/openapi.yaml (ADR-0006). Documented in api/README.md.
+# Run: npx -y @stoplight/spectral-cli@6.17.0 lint --fail-severity=warn api/openapi.yaml
+extends: [['spectral:oas', recommended]]
+
+rules:
+  # The repo is private and has one owner; a contact block adds nothing.
+  info-contact: off
+  # Shared conventions (PageInfo, Page, PageSize, IdempotencyKey) are defined before the first
+  # endpoint uses them, so "unused" is expected while the API is young.
+  oas3-unused-component: off
+
+  operation-operationId: error
+  operation-tags: error
+
+  tsh-operation-id-camel-case:
+    description: operationId is camelCase, because it names generated Go and TypeScript functions.
+    severity: error
+    given: $.paths[*][get,put,post,patch,delete].operationId
+    then:
+      function: casing
+      functionOptions: { type: camel }
+
+  tsh-path-kebab-case:
+    description: Path segments are kebab-case nouns or {camelCase} parameters (ARC-13).
+    severity: error
+    given: $.paths
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[a-z][a-zA-Z0-9]*\}))+$'
+
+  tsh-properties-snake-case:
+    description: JSON properties are snake_case.
+    severity: error
+    given: $.components.schemas..properties
+    then:
+      field: '@key'
+      function: casing
+      functionOptions: { type: snake }
+
+  tsh-default-problem-response:
+    description: Every operation declares `default` as the shared Problem response (RFC 7807, ARC-15).
+    severity: error
+    resolved: false
+    given: $.paths[*][get,put,post,patch,delete].responses
+    then:
+      # truthy catches a missing default; pattern catches a default that is not the shared Problem.
+      - field: default.$ref
+        function: truthy
+      - field: default.$ref
+        function: pattern
+        functionOptions:
+          match: '^#/components/responses/Problem$'
+
+  tsh-string-max-length:
+    description: Every free-text string has maxLength (SEC-26). Enums, and formats with a fixed size, are exempt.
+    severity: error
+    given:
+      - $.components.schemas..properties[*]
+      - $.components.parameters[*].schema
+      - $.paths[*][*].parameters[*].schema
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          if:
+            required: [type]
+            properties: { type: { const: string } }
+            not:
+              anyOf:
+                - required: [enum]
+                - required: [format]
+                  properties: { format: { enum: [date, time, date-time] } }
+          then:
+            required: [maxLength]
+
+  tsh-array-max-items:
+    description: Every array has maxItems (SEC-26).
+    severity: error
+    given:
+      - $.components.schemas..properties[*]
+      - $.components.parameters[*].schema
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          if:
+            required: [type]
+            properties: { type: { const: array } }
+          then:
+            required: [maxItems]
+
+  tsh-list-is-paginated:
+    description: A GET that returns `items` takes the shared page and page_size parameters (GO-56, ARC-16).
+    severity: error
+    given: "$.paths[?(@.get && @.get.responses && @.get.responses['200'] && @.get.responses['200'].content && @.get.responses['200'].content['application/json'] && @.get.responses['200'].content['application/json'].schema.properties && @.get.responses['200'].content['application/json'].schema.properties.items)].get"
+    then:
+      field: parameters
+      function: schema
+      functionOptions:
+        schema:
+          type: array
+          allOf:
+            - contains: { required: [name], properties: { name: { const: page } } }
+            - contains: { required: [name], properties: { name: { const: page_size } } }
+
+  tsh-post-idempotency-key:
+    description: >-
+      POST operations take the Idempotency-Key header (GO-57, ARC-17). A POST that changes nothing
+      may opt out with `x-idempotency: not-required` and a reason in its description.
+    severity: error
+    given: "$.paths[?(@.post && @.post['x-idempotency'] != 'not-required')].post"
+    then:
+      field: parameters
+      function: schema
+      functionOptions:
+        schema:
+          type: array
+          contains: { required: [name, in], properties: { name: { const: Idempotency-Key }, in: { const: header } } }

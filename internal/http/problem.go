@@ -45,7 +45,7 @@ func writeProblem(w http.ResponseWriter, r *http.Request, p Problem) {
 	writeJSON(w, r, p.Status, "application/problem+json", p)
 }
 
-// writeJSON encodes v with the given status. API responses are never cached (SEC-33).
+// writeJSON encodes v with the given status. Caching headers come from apiHeaders.
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, contentType string, v any) {
 	body, err := json.Marshal(v)
 	if err != nil {
@@ -54,10 +54,18 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, contentType s
 		contentType = "application/problem+json"
 		body = []byte(fallbackProblem)
 	}
-	h := w.Header()
-	h.Set("Content-Type", contentType)
-	h.Set("Cache-Control", "no-store")
-	h.Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(status)
 	_, _ = w.Write(body) // If this fails the client has gone; there is nobody left to tell.
+}
+
+// apiHeaders marks every API response as uncacheable and not content-sniffable (SEC-33),
+// including responses written by generated code.
+func apiHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Cache-Control", "no-store")
+		h.Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
 }
