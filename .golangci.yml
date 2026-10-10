@@ -1,0 +1,96 @@
+# golangci-lint v2 configuration (docs/standards/01-go-coding-standards.md §12).
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - contextcheck
+    - cyclop
+    - depguard
+    - errcheck
+    - errorlint
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - noctx
+    - revive
+    - staticcheck
+    - unused
+    - wrapcheck
+  settings:
+    cyclop:
+      max-complexity: 15 # GO-11
+    gosec:
+      # G201/G202 (SQL built from strings) are part of the default set and must stay on (SEC-22).
+      excludes: []
+    revive:
+      rules:
+        - name: exported # GO-29: exported identifiers have godoc
+        - name: package-comments
+        - name: var-naming
+        - name: error-strings
+        - name: error-naming
+        - name: receiver-naming
+        - name: context-as-argument # GO-37
+        - name: unused-parameter
+    depguard:
+      rules:
+        # GO-01: the domain imports nothing internal and no driver, HTTP or AWS package.
+        domain:
+          list-mode: lax
+          files: ["**/internal/domain/**", "!$test"]
+          deny:
+            - pkg: github.com/malcolmjefferson/therapy_service_hours_backend/internal
+              desc: "GO-01: internal/domain must not import other internal packages"
+            - pkg: github.com/jackc/pgx
+              desc: "GO-01: no database driver in the domain"
+            - pkg: github.com/go-chi
+              desc: "GO-01: no HTTP router in the domain"
+            - pkg: net/http
+              desc: "GO-01: no HTTP in the domain"
+            - pkg: github.com/aws
+              desc: "GO-01: no AWS SDK in the domain"
+        # GO-02: services reach storage, HTTP and AWS only through interfaces they declare.
+        service:
+          list-mode: lax
+          files: ["**/internal/service/**", "!$test"]
+          deny:
+            - pkg: github.com/malcolmjefferson/therapy_service_hours_backend/internal/http
+              desc: "GO-02: services must not import the transport layer"
+            - pkg: github.com/malcolmjefferson/therapy_service_hours_backend/internal/db
+              desc: "GO-02: services must declare a store interface instead"
+            - pkg: github.com/jackc/pgx
+              desc: "GO-02: services must not use the driver"
+            - pkg: github.com/go-chi
+              desc: "GO-02: services must not use the router"
+            - pkg: github.com/aws
+              desc: "GO-02: services reach AWS through interfaces"
+    wrapcheck:
+      # Wrapping is enforced on adapter packages, where third-party errors enter (§12).
+      ignore-package-globs:
+        - github.com/malcolmjefferson/therapy_service_hours_backend/*
+  exclusions:
+    generated: strict
+    rules:
+      # wrapcheck applies to adapter packages only (standards §12).
+      - path-except: internal/(db|identity|apigw)/
+        linters: [wrapcheck]
+      # Tests may ignore errors from cleanup and use fixed fixture credentials.
+      - path: _test\.go
+        linters: [errcheck, gosec, wrapcheck]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/malcolmjefferson/therapy_service_hours_backend

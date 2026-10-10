@@ -1,0 +1,93 @@
+name: ci
+
+# Backend PR gates (CLAUDE.md §11.1, §13; SEC-22, SEC-71; GO standards §12). The jobs run in parallel
+# and any failure fails the check. Deploys run in CodePipeline after merge, never here.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: golangci-lint (incl. gosec G201/G202, depguard, gofmt, goimports)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+
+  test:
+    name: go test -race (unit + Testcontainers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Verify modules (SEC-70)
+        run: go mod verify
+      - name: Tests (GO-42, GO-72)
+        run: go test -race -count=1 ./...
+
+  vuln:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: govulncheck (GO-91, SEC-71)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  semgrep:
+    name: Semgrep (no string-built SQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Semgrep
+        run: python3 -m pip install --disable-pip-version-check semgrep==1.180.0
+      - name: The rule catches its seeded fixtures
+        # Fails unless Semgrep actually found and passed the fixture: "No unit tests found" must not pass silently.
+        run: |
+          semgrep --test semgrep/ 2>&1 | tee "${RUNNER_TEMP}/semgrep-test.txt"
+          grep -q "All tests passed" "${RUNNER_TEMP}/semgrep-test.txt"
+      - name: No string-built SQL in the code (SEC-22)
+        run: semgrep scan --config semgrep/no-string-built-sql.yaml --error --metrics=off --exclude semgrep .
+
+  sqlc:
+    name: sqlc output is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: sqlc diff (GO-49)
+        run: scripts/check-sqlc.sh
