@@ -7,7 +7,7 @@
 
 - **Slice S0 (walking skeleton):** 9 done, 0 in review, 0 in progress, 0 not started (of 9 tickets touching this repo).
 - **AWS:** dev deployed end to end by the pipeline on 2026-10-11 (data, migrate, api, web, smoke tests). Prod deploys are deferred to milestone M3 (owner decision 2026-10-11).
-- **Next:** S1 (auth and invites).
+- **S1:** execution started; ADR-0008–0011 accepted by the owner on 2026-10-11.
 
 ## Tickets
 
@@ -24,3 +24,9 @@
 | S0-21 | Runbook v0 and README per repo | done | [backend #12](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/12), infra and frontend PRs | New-developer quick start and the Lambda build; runbook lives in infra |
 
 Statuses: **not started**, **in progress**, **in review** (PR open), **done** (merged to main).
+
+## S1 execution (2026-10-11)
+
+| ID | Title | Status | PRs | Notes |
+|---|---|---|---|---|
+| S1-02 | Auth design decisions | in progress | — | Owner accepted ADR-0008–0011 as proposed on 2026-10-11; decision docs prepared for review. Live federation and latency proof remain S1-18. |
