@@ -14,3 +14,13 @@ WHERE email = sqlc.arg(email)::citext AND status = 'pending' AND expires_at > sq
 
 -- name: GetDefaultOrganization :one
 SELECT * FROM organizations WHERE name = 'Default Organization';
+
+-- name: CheckPreSignUpAdmission :one
+-- One snapshot; presignup_ro needs only its two SELECT grants, not organizations.
+SELECT EXISTS (
+    SELECT 1 FROM invitations
+    WHERE email = sqlc.arg(email)::citext AND status = 'pending' AND expires_at > sqlc.arg(at)::timestamptz
+) AS invited,
+EXISTS (
+    SELECT 1 FROM users WHERE email = sqlc.arg(email)::citext AND status = 'deactivated'
+) AS deactivated;
