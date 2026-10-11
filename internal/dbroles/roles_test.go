@@ -56,11 +56,11 @@ func privileges(t *testing.T, conn *pgx.Conn) string {
 	err := conn.QueryRow(t.Context(), `
 		SELECT string_agg(line, E'\n' ORDER BY line) FROM (
 		  SELECT r.rolname || ' login=' || r.rolcanlogin || ' super=' || r.rolsuper || ' createdb=' || r.rolcreatedb AS line
-		    FROM pg_roles r WHERE r.rolname IN ('app_rw', 'migrator')
+		    FROM pg_roles r WHERE r.rolname IN ('app_rw', 'migrator', 'presignup_ro')
 		  UNION ALL
 		  SELECT m.rolname || ' member_of ' || g.rolname FROM pg_auth_members a
 		    JOIN pg_roles m ON m.oid = a.member JOIN pg_roles g ON g.oid = a.roleid
-		   WHERE m.rolname IN ('app_rw', 'migrator')
+		   WHERE m.rolname IN ('app_rw', 'migrator', 'presignup_ro')
 		  UNION ALL
 		  SELECT 'db ' || coalesce(datacl::text, '') FROM pg_database WHERE datname = current_database()
 		  UNION ALL
@@ -91,8 +91,10 @@ func TestEnsure_RolesLogInThroughIAMWithoutSuperpowers(t *testing.T) {
 	for _, want := range []string{
 		"app_rw login=true super=false createdb=false",
 		"migrator login=true super=false createdb=false",
+		"presignup_ro login=true super=false createdb=false",
 		"app_rw member_of rds_iam",
 		"migrator member_of rds_iam",
+		"presignup_ro member_of rds_iam",
 	} {
 		if !strings.Contains(snapshot, want) {
 			t.Errorf("missing %q in:\n%s", want, snapshot)

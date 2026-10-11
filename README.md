@@ -83,6 +83,13 @@ resolution; the current public health route and release smoke behavior stay as d
 
 Verify with `go test ./internal/apigw ./internal/config ./internal/http`.
 
+The pre-sign-up database role (`presignup_ro`, S1-17) has IAM login, CONNECT, schema USAGE and
+SELECT on exactly `users` and `invitations`. Bootstrap creates the role before migration; migration
+00002 supplies exact table grants, and bootstrap can grant them if the tables already exist.
+There is no SELECT default privilege on future tables. Verify with Docker running:
+`go test ./internal/dbroles`. The tests emulate the non-superuser RDS master, rerun bootstrap,
+apply the real schema as migrator, and deny writes and reads of unrelated tables.
+
 ## Migrations (ADR-0003)
 
 - SQL files live in `db/migrations/` (goose format, `-- +goose Up` only; forward-only) and are embedded into the `migrate` Lambda (`cmd/migrate`).
