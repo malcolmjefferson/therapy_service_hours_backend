@@ -135,6 +135,27 @@ Generated queries live in `internal/db/identityqueries`. This approved MIT-licen
 replaces handwritten query code and is not imported into the Lambda binaries. Verify schema and
 queries with Docker running: `go test ./internal/migrate ./internal/db/...` and `go tool sqlc diff`.
 
+## Identity seed Lambda (S1-09)
+
+`cmd/seed` is invoked through IAM, with no public HTTP route. It connects as `app_rw` using
+the shared two-connection IAM/TLS pool. A 45-second operation budget fits the 60-second Lambda.
+The validated request has `admin_email`, `include_dev_users` and `allow_prod`; prod requires
+`allow_prod: true` and always rejects dev fixtures. The deployment's `APP_ENV` is authoritative.
+
+One transaction creates the Default Organization, admin users row and pending 14-day invitation.
+Dev optionally adds `test-invited` and `test-supervisor`; `test-uninvited` has no DB row/invite.
+Repeat runs preserve IDs, invitation expiry, accepted history and subject bindings. Expired pending
+invitations are revoked and renewed once. Deactivation or conflicting organization/role state
+aborts the entire transaction rather than overwriting account authority. Logs/results contain
+only stable codes, request IDs, timing and counts; no emails or raw database errors.
+
+The paired infra dev step runs after migrations and app deployment, with Cognito creation outside
+the VPC and suppressed notifications. Release the pipeline build-discovery fix before this
+backend binary, then release the backend before infra consumes `seed/bootstrap`. Verify with
+`go test ./internal/service/seed ./internal/seed ./internal/migrate` (Docker PostgreSQL 17),
+`go vet ./...`, the configured linter and `go tool sqlc diff`. Live seed idempotency and invitation
+admission checks are recorded after the paired infra release. Cognito activation remains later work.
+
 ## CI gates (`.github/workflows/ci.yml`)
 
 Every PR runs these in parallel; any failure blocks the merge:

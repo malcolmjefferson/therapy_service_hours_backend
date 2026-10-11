@@ -3,7 +3,7 @@
 > Ticket status for this repo. Updated in the same PR that changes a ticket's state (CLAUDE.md §0.10).
 > Tickets: `docs/jira/`. Other repos: [frontend](https://github.com/malcolmjefferson/therapy_service_hours_frontend/blob/main/STATUS.md), [infra](https://github.com/malcolmjefferson/therapy_service_hours_infra/blob/main/STATUS.md).
 
-## Summary (2026-10-10)
+## Summary (2026-10-11)
 
 - **Slice S0 (walking skeleton):** 9 done, 0 in review, 0 in progress, 0 not started (of 9 tickets touching this repo).
 - **AWS:** dev deployed end to end by the pipeline on 2026-10-11 (data, migrate, api, web, smoke tests). Prod deploys are deferred to milestone M3 (owner decision 2026-10-11).
@@ -34,4 +34,5 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 | S1-05 | OpenAPI /me and shared Problem responses | done | [#19](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/19) | Released with frontend S1-19; route implementation remains S1-08. |
 | S1-04 | Identity schema and generated queries | done | [#20](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/20) | Identity migration applied in the successful dev release 2026-10-11. PostgreSQL 17 lifecycle and uniqueness tests pass. |
 | S1-17 | Read-only pre-sign-up database role | done | [#21](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/21) | Released to dev with infra #31. Exact SELECT-only grants tested; S1-03 adds the trigger. |
-| S1-03 | Invitation allowlist trigger | in progress | [#22](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/22), [infra #33](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/33) | Backend and paired infra implementation prepared. Policy, privacy and PostgreSQL tests pass. Live deployment and measured p99 remain pending (S1-18). |
+| S1-03 | Invitation allowlist trigger | in progress | [#22](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/22), [infra #33](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/33) | Merged and deployed in successful dev release 7c97ec40-371c-4387-8c26-817c75450d4c. Alias READY at 1/1; synthetic uninvited event returns SIGN_UP_NOT_ALLOWED with safe logs. Policy, privacy and PostgreSQL tests pass. Auth remains disabled; actual Google federation and measured cold/warm p99 remain pending (S1-18). |
+| S1-09 | Identity seed Lambda | in progress | [backend #23](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/23), [infra #35](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/35) | Backend implementation prepared: environment guards, atomic/idempotent DB seed, safe responses and PostgreSQL tests. The paired infra release adds dev-only native identities outside the VPC. Live seed/admission verification remains pending; auth stays disabled. |
