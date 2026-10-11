@@ -29,6 +29,7 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 
 | ID | Title | Status | PRs | Notes |
 |---|---|---|---|---|
-| S1-02 | Auth design decisions | in progress | — | Owner accepted ADR-0008–0011 as proposed on 2026-10-11; decision docs prepared for review. Live federation and latency proof remain S1-18. |
-| S1-15 | Authorizer claims through the Lambda adapter | in review | — | Trusted context transport, fail-closed middleware, and Lambda/local HTTP startup guard implemented. Focused adapter, config and HTTP tests pass; protected route integration follows in S1-06. |
-| S1-05 | OpenAPI /me and shared Problem responses | in progress | — | ID-token scheme, explicit profile DTO, and both Gateway/API 401 shapes defined first. Must release with frontend S1-19; route implementation remains S1-08. |
+| S1-02 | Auth design decisions | in review | [#17](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/17) | Owner accepted ADR-0008–0011 on 2026-10-11. Live federation and latency proof remain S1-18. |
+| S1-15 | Authorizer claims through the Lambda adapter | in review | [#18](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/18) | Trusted context transport, fail-closed middleware, and Lambda/local HTTP startup guard implemented. Focused tests pass; protected route integration follows in S1-06. |
+| S1-05 | OpenAPI /me and shared Problem responses | in review | [#19](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/19) | Spectral and contract tests pass. Must release with frontend S1-19; route implementation remains S1-08. |
+| S1-04 | Identity schema and generated queries | in progress | — | Migration and PostgreSQL 17 integration tests pass: email/sub uniqueness, invitation lifecycle, expiry, typed lookups and migration idempotence. Live migrate-Lambda application remains pending. |
