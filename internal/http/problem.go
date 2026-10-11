@@ -16,6 +16,7 @@ const (
 	ProblemMethodNotAllowed ProblemType = "urn:therapy-service-hours:problem:method-not-allowed"
 	ProblemBodyTooLarge     ProblemType = "urn:therapy-service-hours:problem:body-too-large"
 	ProblemForbidden        ProblemType = "urn:therapy-service-hours:problem:forbidden"
+	ProblemUnauthorized     ProblemType = "urn:therapy-service-hours:problem:unauthorized"
 	ProblemConflict         ProblemType = "urn:therapy-service-hours:problem:conflict"
 	ProblemValidation       ProblemType = "urn:therapy-service-hours:problem:validation"
 )

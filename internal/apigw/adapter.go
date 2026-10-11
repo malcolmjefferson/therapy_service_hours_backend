@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"net/http"
 	"net/http/httptest"
@@ -39,6 +40,13 @@ func Handler(h http.Handler, setRequestID RequestIDSetter) func(context.Context,
 }
 
 func toHTTPRequest(ctx context.Context, event events.APIGatewayV2HTTPRequest) (*http.Request, error) {
+	// Always replace inherited claims, including when this event has no authorizer.
+	// This keeps an invocation's identity bound to its own validated Gateway event.
+	var claims map[string]string
+	if auth := event.RequestContext.Authorizer; auth != nil && auth.JWT != nil {
+		claims = maps.Clone(auth.JWT.Claims)
+	}
+	ctx = context.WithValue(ctx, claimsKey{}, claims)
 	body := []byte(event.Body)
 	if event.IsBase64Encoded {
 		decoded, err := base64.StdEncoding.DecodeString(event.Body)

@@ -23,7 +23,7 @@ type Config struct {
 	// MaxBodyBytes is the largest request body the API accepts.
 	MaxBodyBytes int64
 	// LocalHTTPAddr, when set, serves plain HTTP on this address instead of the Lambda runtime.
-	// It exists for local development only; CDK never sets it.
+	// It is rejected when Lambda runtime environment markers are present.
 	LocalHTTPAddr string
 }
 
@@ -45,6 +45,9 @@ func Load(lookup LookupFunc) (Config, error) {
 		errs = append(errs, errors.New("APP_VERSION is required"))
 	}
 	cfg.Version = version
+	if cfg.LocalHTTPAddr != "" && runningOnLambda(lookup) {
+		errs = append(errs, errors.New("LOCAL_HTTP_ADDR is forbidden in the Lambda runtime"))
+	}
 
 	level, err := parseLevel(valueOr(lookup, "LOG_LEVEL", "info"))
 	if err != nil {
@@ -65,6 +68,15 @@ func Load(lookup LookupFunc) (Config, error) {
 		return Config{}, fmt.Errorf("invalid configuration: %w", errors.Join(errs...))
 	}
 	return cfg, nil
+}
+
+func runningOnLambda(lookup LookupFunc) bool {
+	for _, key := range []string{"AWS_LAMBDA_FUNCTION_NAME", "AWS_LAMBDA_RUNTIME_API", "AWS_EXECUTION_ENV"} {
+		if valueOr(lookup, key, "") != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func valueOr(lookup LookupFunc, key, fallback string) string {

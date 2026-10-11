@@ -35,24 +35,48 @@ func TestLoad_AppliesDefaults(t *testing.T) {
 func TestLoad_ReadsEveryVariable(t *testing.T) {
 	t.Parallel()
 	cfg, err := config.Load(lookupFrom(map[string]string{
-		"APP_VERSION":              " v1.2.3 ",
-		"AWS_LAMBDA_FUNCTION_NAME": "therapy-service-hours-dev-api",
-		"LOG_LEVEL":                "debug",
-		"MAX_BODY_BYTES":           "2048",
-		"LOCAL_HTTP_ADDR":          "127.0.0.1:8080",
+		"APP_VERSION":     " v1.2.3 ",
+		"LOG_LEVEL":       "debug",
+		"MAX_BODY_BYTES":  "2048",
+		"LOCAL_HTTP_ADDR": "127.0.0.1:8080",
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	want := config.Config{
 		Version:       "v1.2.3",
-		Function:      "therapy-service-hours-dev-api",
+		Function:      "api",
 		LogLevel:      slog.LevelDebug,
 		MaxBodyBytes:  2048,
 		LocalHTTPAddr: "127.0.0.1:8080",
 	}
 	if cfg != want {
 		t.Fatalf("got %+v, want %+v", cfg, want)
+	}
+}
+
+func TestLoad_RejectsLocalHTTPInLambda(t *testing.T) {
+	t.Parallel()
+	for _, marker := range []string{"AWS_LAMBDA_FUNCTION_NAME", "AWS_LAMBDA_RUNTIME_API", "AWS_EXECUTION_ENV"} {
+		t.Run(marker, func(t *testing.T) {
+			t.Parallel()
+			_, err := config.Load(lookupFrom(map[string]string{
+				"APP_VERSION": "test", "LOCAL_HTTP_ADDR": "127.0.0.1:8080", marker: "lambda",
+			}))
+			if err == nil || !strings.Contains(err.Error(), "LOCAL_HTTP_ADDR is forbidden") {
+				t.Fatalf("Load with %s = %v, want local HTTP rejected", marker, err)
+			}
+		})
+	}
+}
+
+func TestLoad_LambdaConfigurationPreservesFunctionName(t *testing.T) {
+	t.Parallel()
+	cfg, err := config.Load(lookupFrom(map[string]string{
+		"APP_VERSION": "test", "AWS_LAMBDA_FUNCTION_NAME": "therapy-service-hours-dev-api",
+	}))
+	if err != nil || cfg.Function != "therapy-service-hours-dev-api" {
+		t.Fatalf("Load = %+v, %v", cfg, err)
 	}
 }
 
