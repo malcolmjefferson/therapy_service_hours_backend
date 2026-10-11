@@ -7,13 +7,15 @@ info:
     Conventions every endpoint follows (see api/README.md for the full list):
 
     - **Base path** `/api/v1`, JSON bodies, `snake_case` field names.
-    - **Errors** are RFC 7807 `application/problem+json` using the `Problem` schema. Clients branch on
-      `type`, which is a stable URN per error kind.
+    - **Errors** from the API are RFC 7807 `application/problem+json` using the `Problem` schema.
+      Clients branch on `type`, which is a stable URN per error kind. The Gateway authorizer's own
+      401 response is `application/json` with a `message` field; clients handle either shape.
     - **Pagination:** list endpoints take `page` (1-based) and `page_size` (default 50, maximum 200)
       and return `items` plus a `page` object (`PageInfo`). Order is stable, with `id` as the tiebreaker.
     - **Idempotency:** POST endpoints that create or bulk-change data take the `Idempotency-Key` header.
       Repeating a key with the same body returns the original result; a different body returns 409.
-    - **Authentication:** every route requires a Cognito JWT except those that declare `security: []`.
+    - **Authentication:** every route requires a Cognito ID token except those that declare
+      `security: []`. Roles come from the database; token group claims grant no permissions.
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -24,7 +26,41 @@ security:
 tags:
   - name: system
     description: Operational endpoints
+  - name: identity
+    description: Current authenticated user
 paths:
+  /me:
+    get:
+      operationId: getMe
+      tags: [identity]
+      summary: Read the current user's profile and effective roles
+      description: |
+        Returns explicit profile fields for an active, invited user. Roles are re-read from the
+        database on each request. The first request binds a verified identity and accepts the
+        invitation in one transaction; an uninvited or deactivated user is refused.
+      responses:
+        '200':
+          description: The current active user's profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+              example:
+                id: '00000000-0000-4000-8000-000000000002'
+                name: Pseudonym A
+                email: pseudonym-a@example.test
+                roles: [admin]
+                organization:
+                  id: '00000000-0000-4000-8000-000000000001'
+                  name: Default Organization
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
   /healthz:
     get:
       operationId: getHealth
@@ -47,7 +83,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Cognito access token, validated by the API Gateway JWT authorizer (SEC-03).
+      description: |
+        Cognito ID token, validated by the API Gateway JWT authorizer against the configured
+        issuer and app-client audience (ADR-0008). The API reads identity only from authorizer
+        context and requires verified email for first-sign-in binding; it never parses the bearer
+        header for claims. Access tokens are not API credentials. Database roles are authoritative.
   parameters:
     Page:
       name: page
@@ -81,6 +121,36 @@ components:
         format: uuid
         maxLength: 36
   responses:
+    Unauthorized:
+      description: |
+        Missing or invalid authentication. The API returns Problem. The API Gateway JWT
+        authorizer instead returns application/json with a message field, before Lambda runs;
+        HTTP APIs cannot customize that response. Clients must handle both shapes.
+      headers:
+        WWW-Authenticate:
+          description: Bearer authentication challenge when returned by the API.
+          schema:
+            type: string
+            maxLength: 200
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GatewayUnauthorized'
+    Forbidden:
+      description: Access has not been granted, or the current user is deactivated.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The requested resource was not found or may not be disclosed to this user.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Problem:
       description: An error, as RFC 7807 problem details.
       content:
@@ -88,6 +158,51 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    MeResponse:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, roles, organization]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 401
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        roles:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          description: Effective database roles. An ordinary user has an empty array.
+          items:
+            type: string
+            enum: [admin, supervisor]
+        organization:
+          $ref: '#/components/schemas/OrganizationProfile'
+    OrganizationProfile:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 200
+    GatewayUnauthorized:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          maxLength: 200
     HealthResponse:
       type: object
       additionalProperties: false
