@@ -67,7 +67,21 @@ Build from a clean checkout of `origin/main`.
 | `APP_VERSION` | Yes | Build identifier reported by `/api/v1/healthz` |
 | `LOG_LEVEL` | No (`info`) | `debug`, `info`, `warn` or `error` |
 | `MAX_BODY_BYTES` | No (1 MiB) | Largest accepted request body |
-| `LOCAL_HTTP_ADDR` | No | Local development only: serve plain HTTP instead of the Lambda runtime |
+| `LOCAL_HTTP_ADDR` | No | Local development only: serve plain HTTP instead of the Lambda runtime; startup rejects it when Lambda runtime markers are present |
+
+## Trusted authorizer claims (S1-15)
+
+The Lambda adapter copies only `RequestContext.Authorizer.JWT.Claims` into a private context key.
+Read them with `apigw.JWTClaimsFrom(ctx)`; it returns a copy and cannot be populated by HTTP headers.
+An event without a JWT authorizer clears any inherited identity. Local HTTP requests have no trusted
+claims, and local HTTP mode cannot start in a Lambda environment.
+
+Protected route middleware uses `httpapi.RequireAuthorizerClaims` before resolving the actor. It
+returns a generic 401 problem with `WWW-Authenticate: Bearer` when trusted subject claims are absent.
+It does not log token material or personal attributes. S1-06 mounts this guard with DB actor
+resolution; the current public health route and release smoke behavior stay as deployed until S1-14.
+
+Verify with `go test ./internal/apigw ./internal/config ./internal/http`.
 
 ## Migrations (ADR-0003)
 

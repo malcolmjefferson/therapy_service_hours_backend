@@ -30,3 +30,4 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 | ID | Title | Status | PRs | Notes |
 |---|---|---|---|---|
 | S1-02 | Auth design decisions | in progress | — | Owner accepted ADR-0008–0011 as proposed on 2026-10-11; decision docs prepared for review. Live federation and latency proof remain S1-18. |
+| S1-15 | Authorizer claims through the Lambda adapter | in review | — | Trusted context transport, fail-closed middleware, and Lambda/local HTTP startup guard implemented. Focused adapter, config and HTTP tests pass; protected route integration follows in S1-06. |
