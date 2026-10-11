@@ -52,7 +52,7 @@ Requires Go 1.27 (pinned in `go.mod`).
 The pipeline builds every Lambda; a manual deploy (see the [runbook](https://github.com/malcolmjefferson/therapy_service_hours_infra/blob/main/docs/runbook.md#2-deploy-flow)) needs the same layout, which infra reads from `BACKEND_DIST`:
 
 ```bash
-for c in api migrate dbbootstrap dbbootstrap-provider; do
+for c in api migrate dbbootstrap dbbootstrap-provider presignup; do
   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/$c/bootstrap" "./cmd/$c"
 done
 git rev-parse HEAD > dist/VERSION   # reported by /api/v1/healthz
@@ -89,6 +89,33 @@ SELECT on exactly `users` and `invitations`. Bootstrap creates the role before m
 There is no SELECT default privilege on future tables. Verify with Docker running:
 `go test ./internal/dbroles`. The tests emulate the non-superuser RDS master, rerun bootstrap,
 apply the real schema as migrator, and deny writes and reads of unrelated tables.
+
+## Pre-sign-up invitation gate (S1-03)
+
+`cmd/presignup` warms a single `presignup_ro` IAM/TLS connection during Lambda initialization.
+The separate pool has a 3-second connect timeout; the API keeps its 12-second timeout. The
+Cognito event adapter bounds admission work to 4 seconds. It accepts verified Google federated
+events only when one static sqlc query finds a pending unexpired invitation and no deactivated
+user. It never creates a user, binds a subject, or accepts an invitation; S1-06 owns those writes.
+
+Policy denials return `SIGN_UP_NOT_ALLOWED`; database or deadline failures return
+`SIGN_UP_UNAVAILABLE`. Logs contain only the decision code, request ID and duration. Verification
+flags are cleared: Google supplies the mapped verified email, and the trigger cannot transfer
+another user's email alias. Existing Cognito users do not reach pre-sign-up again; their
+deactivation must be enforced by the S1-06 API middleware.
+
+`APP_ENV` is required (`dev` or `prod`), along with the normal database settings. Startup rejects
+any DB user except `presignup_ro` and any auth mode except IAM. For ADR-0011 in dev only,
+`PreSignUp_AdminCreateUser` admits exactly `test-invited`, `test-uninvited` and `test-supervisor`
+with matching `<username>@example.invalid` emails. This lets S1-09 create the intentionally
+uninvited native test user for API-denial tests. Ordinary native sign-up, real admin-created
+users and all federated events have no such exception. Prod admits none of those native users.
+
+Verify `go test ./internal/presignup ./internal/service/presignup ./internal/dbroles ./internal/db`
+with Docker running, then `go vet ./...`, the configured golangci-lint gate, and `go tool sqlc diff`.
+Merge and release this backend implementation before the paired infra PR adds the new command
+to its build list. The infra alias is deployed with auth disabled before pool activation.
+Measured cold/warm p99 and real Google federation remain S1-18; passing unit tests is not latency proof.
 
 ## Migrations (ADR-0003)
 

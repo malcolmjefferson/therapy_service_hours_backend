@@ -99,13 +99,36 @@ func (s Settings) validate() error {
 // In AuthIAM mode, tokens supplies the password for each new connection.
 // Every connection failure is returned as a *ConnectError, which matches ErrUnavailable.
 func Open(ctx context.Context, s Settings, tokens *TokenSource) (*pgxpool.Pool, error) {
+	return open(ctx, s, tokens, poolConfig)
+}
+
+// PreSignUpConnectTimeout leaves room for the query and response inside Cognito's five seconds.
+const PreSignUpConnectTimeout = 3 * time.Second
+
+// OpenPreSignUp warms one IAM-authenticated connection during provisioned-concurrency init.
+// It never changes the API's connection timeout or connection budget (ADR-0007).
+func OpenPreSignUp(ctx context.Context, s Settings, tokens *TokenSource) (*pgxpool.Pool, error) {
+	return open(ctx, s, tokens, preSignUpPoolConfig)
+}
+
+func preSignUpPoolConfig(s Settings, tokens *TokenSource) (*pgxpool.Config, error) {
+	cfg, err := poolConfig(s, tokens)
+	if err != nil {
+		return nil, err
+	}
+	cfg.ConnConfig.ConnectTimeout = PreSignUpConnectTimeout
+	cfg.MaxConns, cfg.MinConns = MaxConns, 1
+	return cfg, nil
+}
+
+func open(ctx context.Context, s Settings, tokens *TokenSource, configure func(Settings, *TokenSource) (*pgxpool.Config, error)) (*pgxpool.Pool, error) {
 	if err := s.validate(); err != nil {
 		return nil, fmt.Errorf("database settings: %w", err)
 	}
 	if s.Mode == AuthIAM && tokens == nil {
 		return nil, errors.New("database settings: IAM auth needs a token source")
 	}
-	cfg, err := poolConfig(s, tokens)
+	cfg, err := configure(s, tokens)
 	if err != nil {
 		return nil, err
 	}

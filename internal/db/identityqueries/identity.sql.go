@@ -11,6 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkPreSignUpAdmission = `-- name: CheckPreSignUpAdmission :one
+SELECT EXISTS (
+    SELECT 1 FROM invitations
+    WHERE email = $1::citext AND status = 'pending' AND expires_at > $2::timestamptz
+) AS invited,
+EXISTS (
+    SELECT 1 FROM users WHERE email = $1::citext AND status = 'deactivated'
+) AS deactivated
+`
+
+type CheckPreSignUpAdmissionParams struct {
+	Email string
+	At    pgtype.Timestamptz
+}
+
+type CheckPreSignUpAdmissionRow struct {
+	Invited     bool
+	Deactivated bool
+}
+
+// One snapshot; presignup_ro needs only its two SELECT grants, not organizations.
+func (q *Queries) CheckPreSignUpAdmission(ctx context.Context, arg CheckPreSignUpAdmissionParams) (CheckPreSignUpAdmissionRow, error) {
+	row := q.db.QueryRow(ctx, checkPreSignUpAdmission, arg.Email, arg.At)
+	var i CheckPreSignUpAdmissionRow
+	err := row.Scan(&i.Invited, &i.Deactivated)
+	return i, err
+}
+
 const getDefaultOrganization = `-- name: GetDefaultOrganization :one
 SELECT id, name, created_at FROM organizations WHERE name = 'Default Organization'
 `
