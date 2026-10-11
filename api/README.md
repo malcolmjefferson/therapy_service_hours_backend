@@ -4,6 +4,15 @@
 
 ## Workflow for a contract change
 
+S1-05 defines `/me` before its S1-08 implementation. The generator currently excludes `getMe`
+from route generation while retaining its models. The embedded server spec is filtered too; the
+full published contract remains `api/openapi.yaml`. Remove the
+`exclude-operation-ids` filter in S1-08, implement the strict handler, and regenerate. There is no
+placeholder `/me` handler exposed by this contract-only change.
+
+Merge the S1-19 frontend pinned-spec/types/handler update with this contract in one release;
+the pipeline's drift gate checks the backend commit and pinned frontend copy byte for byte.
+
 1. Edit `api/openapi.yaml`.
 2. Regenerate the Go server: `go generate ./...` (writes `internal/http/gen/api.gen.go`, which is committed).
 3. Implement the new method of `gen.StrictServerInterface` in `internal/http`. The build fails until you do.
