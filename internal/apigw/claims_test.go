@@ -53,7 +53,7 @@ func TestHandler_DoesNotCarryIdentityIntoAnotherEvent(t *testing.T) {
 	var previous context.Context
 	calls := 0
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, ok := apigw.JWTClaimsFrom(r.Context())
+		_, ok := apigw.JWTClaimsFrom(r.Context()) //nolint:contextcheck // Deliberately reuse a prior invocation context to prove identity isolation.
 		if ok != (calls == 0) {
 			t.Errorf("invocation %d trusted = %v", calls, ok)
 		}
