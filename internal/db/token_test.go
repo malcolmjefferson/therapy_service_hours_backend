@@ -188,6 +188,10 @@ func TestPoolConfig_IAMUsesVerifiedTLSAndTheLimits(t *testing.T) {
 	if cfg.ConnConfig.Password != "" {
 		t.Error("IAM mode must not carry a static password")
 	}
+	// The api Lambda times out at 15 s; a connect must fit inside it with time to answer.
+	if got := cfg.ConnConfig.ConnectTimeout; got != IAMConnectTimeout || got <= 5*time.Second || got >= 15*time.Second {
+		t.Errorf("IAM ConnectTimeout = %v, want IAMConnectTimeout, above 5 s and below the 15 s Lambda timeout", got)
+	}
 }
 
 func TestPoolConfig_PasswordModeVerifiesTLSOnlyWhenAsked(t *testing.T) {
