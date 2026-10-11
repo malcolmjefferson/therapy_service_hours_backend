@@ -1,0 +1,14 @@
+version: '2'
+sql:
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries
+    gen:
+      go:
+        package: identityqueries
+        out: internal/db/identityqueries
+        sql_package: pgx/v5
+        emit_empty_slices: true
+        overrides:
+          - db_type: citext
+            go_type: string

@@ -37,16 +37,16 @@ func open(t *testing.T, database string) *sql.DB {
 	return conn
 }
 
-func TestRun_AppliesTheBaselineThenIsANoOp(t *testing.T) {
+func TestRun_AppliesTheMigrationsThenIsANoOp(t *testing.T) {
 	database := server.NewDatabase(t)
 	conn := open(t, database)
 
 	first := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{})
-	if first.Status != migrate.StatusOK || len(first.Applied) != 1 || first.Applied[0] != 1 || first.Version != 1 {
+	if first.Status != migrate.StatusOK || len(first.Applied) != 2 || first.Applied[0] != 1 || first.Applied[1] != 2 || first.Version != 2 {
 		t.Fatalf("first run = %+v", first)
 	}
 	second := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{})
-	if second.Status != migrate.StatusOK || len(second.Applied) != 0 || second.Version != 1 {
+	if second.Status != migrate.StatusOK || len(second.Applied) != 0 || second.Version != 2 {
 		t.Fatalf("second run should be a no-op, got %+v", second)
 	}
 
@@ -84,7 +84,7 @@ func TestRun_WaitsForTheAdvisoryLock(t *testing.T) {
 	}
 	select {
 	case res := <-done:
-		if res.Status != migrate.StatusOK || len(res.Applied) != 1 {
+		if res.Status != migrate.StatusOK || len(res.Applied) != 2 {
 			t.Errorf("run after the lock was released = %+v", res)
 		}
 	case <-time.After(15 * time.Second):
@@ -109,13 +109,13 @@ func TestRun_ConcurrentRunsApplyEachMigrationOnce(t *testing.T) {
 
 	applied := 0
 	for _, r := range results {
-		if r.Status != migrate.StatusOK || r.Version != 1 {
+		if r.Status != migrate.StatusOK || r.Version != 2 {
 			t.Errorf("run = %+v", r)
 		}
 		applied += len(r.Applied)
 	}
-	if applied != 1 {
-		t.Errorf("baseline applied %d times across both runs, want exactly 1", applied)
+	if applied != 2 {
+		t.Errorf("migrations applied %d times across both runs, want exactly 2", applied)
 	}
 }
 

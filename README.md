@@ -90,6 +90,17 @@ Verify with `go test ./internal/apigw ./internal/config ./internal/http`.
 - Destructive statements (`DROP`, `ALTER ... DROP`, `TRUNCATE`, `RENAME`) are allowed only in a file with a `-- +contract` line; `scripts/check-migrations.sh` enforces this in CI.
 - Local run against a container: `DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=app DB_USER=app DB_AUTH=password DB_PASSWORD=... go run ./cmd/migrate` (invokes need a Lambda runtime; tests call `internal/migrate` directly).
 
+The S1 identity migration creates organizations, case-insensitive unique user emails, unique nullable
+Cognito subjects, and invitation history with one pending invitation per email. Invitations default
+to 14 days; the allowlist query excludes accepted, revoked and expired invitations, including the
+exact expiry instant. First-sign-in acceptance is implemented in S1-06. Default Organization is
+seeded once by name, and rerunning the migration Lambda is a no-op.
+
+SQL source lives in `db/queries/identity.sql`; `go generate ./...` runs the pinned sqlc v1.31.1 tool.
+Generated queries live in `internal/db/identityqueries`. This approved MIT-licensed build tool
+replaces handwritten query code and is not imported into the Lambda binaries. Verify schema and
+queries with Docker running: `go test ./internal/migrate ./internal/db/...` and `go tool sqlc diff`.
+
 ## CI gates (`.github/workflows/ci.yml`)
 
 Every PR runs these in parallel; any failure blocks the merge:
@@ -100,7 +111,7 @@ Every PR runs these in parallel; any failure blocks the merge:
 | `test` | `go mod verify`, then `go test -race` including Testcontainers integration tests |
 | `vuln` | `govulncheck` (the toolchain is pinned in `go.mod`; bump it when the standard library gets a fix) |
 | `semgrep` | `semgrep/no-string-built-sql.yaml` forbids `fmt.Sprintf`, `+` or `strings.Builder` SQL in `Exec`/`Query`/`QueryRow`; `semgrep --test` proves the rule still catches its seeded fixture |
-| `sqlc` | `sqlc diff` once `sqlc.yaml` exists (S2) |
+| `sqlc` | `go tool sqlc diff` for the generated identity queries (S1-04) |
 
 Plus `contract.yml` (API contract, S0-04), `migrations.yml` (no untagged destructive SQL, S0-10) and `secret-scan.yml` (gitleaks). Dependabot opens weekly update PRs for Go modules and Actions.
 

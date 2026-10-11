@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fails if sqlc-generated code differs from what db/queries would generate (GO-49, SEC-22).
-# Until the first query exists (S2), there is no sqlc.yaml and the check passes with a notice.
+# S1 identity queries introduce sqlc.yaml; the generator is pinned as a Go tool.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
