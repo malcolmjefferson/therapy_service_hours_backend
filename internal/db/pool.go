@@ -22,6 +22,14 @@ import (
 // connection budget against the API Lambda's reserved concurrency (GO-40, ADR-0001).
 const MaxConns = 2
 
+// Connect timeouts per new connection. RDS checks an IAM token through its auth proxy, which took
+// more than 5 s on the first connection to a fresh dev instance (2026-10-11): the token was
+// accepted, but after the client had given up. Password connections answer at once.
+const (
+	PasswordConnectTimeout = 5 * time.Second
+	IAMConnectTimeout      = 12 * time.Second
+)
+
 //go:embed certs/us-west-2-bundle.pem
 var rdsCABundle []byte
 
@@ -123,7 +131,7 @@ func poolConfig(s Settings, tokens *TokenSource) (*pgxpool.Config, error) {
 	cc.Port = uint16(s.Port) //nolint:gosec // G115: validate() bounds the port to 1..65535.
 	cc.Database = s.Database
 	cc.User = s.User
-	cc.ConnectTimeout = 5 * time.Second
+	cc.ConnectTimeout = PasswordConnectTimeout
 	cc.Fallbacks = nil
 	cc.RuntimeParams = map[string]string{"application_name": "therapy-service-hours"}
 
@@ -140,6 +148,7 @@ func poolConfig(s Settings, tokens *TokenSource) (*pgxpool.Config, error) {
 			return nil, err
 		}
 		cc.TLSConfig = tlsCfg
+		cc.ConnectTimeout = IAMConnectTimeout
 		cfg.BeforeConnect = func(ctx context.Context, c *pgx.ConnConfig) error {
 			token, err := tokens.Token(ctx)
 			if err != nil {

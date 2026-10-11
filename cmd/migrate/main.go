@@ -14,6 +14,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/db/migrations"
@@ -90,10 +91,43 @@ func (h *handler) connection(ctx context.Context) (*sql.DB, error) {
 			return nil, fmt.Errorf("token source: %w", err)
 		}
 	}
-	pool, err := db.Open(ctx, settings, tokens)
+	pool, err := openWithRetry(ctx, h.logger, connectAttempts, connectBackoff, func(ctx context.Context) (*pgxpool.Pool, error) {
+		return db.Open(ctx, settings, tokens)
+	})
 	if err != nil {
-		return nil, err //nolint:wrapcheck // db.Open returns a descriptive *db.ConnectError.
+		return nil, err
 	}
 	h.conn = stdlib.OpenDBFromPool(pool)
 	return h.conn, nil
+}
+
+// The first IAM-authenticated connection to a fresh instance can outlast the connect timeout
+// while RDS's auth proxy warms up; a retry then succeeds quickly. The Lambda runs for up to 15
+// minutes, so a few attempts cost little and spare a failed release.
+const (
+	connectAttempts = 3
+	connectBackoff  = 2 * time.Second
+)
+
+// openWithRetry calls open up to attempts times, waiting backoff, then twice that, between
+// failures. It returns the last error, and stops early when ctx ends.
+func openWithRetry(ctx context.Context, logger *slog.Logger, attempts int, backoff time.Duration, open func(context.Context) (*pgxpool.Pool, error)) (*pgxpool.Pool, error) {
+	var err error
+	for i := 1; i <= attempts; i++ {
+		var pool *pgxpool.Pool
+		if pool, err = open(ctx); err == nil {
+			return pool, nil
+		}
+		if i == attempts {
+			break
+		}
+		logger.Warn("migrate: connect failed, retrying", slog.Int("attempt", i), slog.String("error", err.Error()))
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("connect: %w (gave up: %w)", err, ctx.Err())
+		case <-time.After(backoff):
+		}
+		backoff *= 2
+	}
+	return nil, err
 }
