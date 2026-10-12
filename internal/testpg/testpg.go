@@ -17,7 +17,7 @@ import (
 )
 
 // Image is the PostgreSQL version the tests run against; it matches the RDS major version.
-const Image = "postgres:17-alpine"
+const Image = "public.ecr.aws/docker/library/postgres:17-alpine"
 
 // Server is a running container.
 type Server struct {
@@ -31,6 +31,15 @@ type Server struct {
 //
 //	func TestMain(m *testing.M) { os.Exit(testpg.Main(m, &server)) }
 func Main(m *testing.M, out **Server) int {
+	// Ryuk is also published by Testcontainers on GHCR. PostgreSQL's fully
+	// qualified ECR reference is not rewritten by this Docker Hub substitutor.
+	// Preserve an operator's explicit registry prefix when one is configured.
+	if os.Getenv("TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX") == "" {
+		if err := os.Setenv("TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX", "ghcr.io"); err != nil {
+			fmt.Fprintln(os.Stderr, "configure test image registry failed")
+			return 1
+		}
+	}
 	srv, err := start(context.Background())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "start postgres container: %v\n", err)
