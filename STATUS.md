@@ -29,6 +29,7 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 
 | ID | Title | Status | PRs | Notes |
 |---|---|---|---|---|
+| S1-20 | Additional admin recovery | done | [backend #26](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/26), [infra #38](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/38) | Backend #26 and infra #38 merged. Recovery tests and runbook pass; the owner elected to retain the sole dev admin. No second live identity or recovery drill is claimed. |
 | S1-02 | Auth design decisions | done | [#17](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/17) | Owner accepted ADR-0008–0011 on 2026-10-11. Live federation and latency proof remain S1-18. |
 | S1-15 | Authorizer claims through the Lambda adapter | done | [#18](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/18) | Released to dev. Protected route integration follows in S1-06. |
 | S1-05 | OpenAPI /me and shared Problem responses | done | [#19](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/19) | Released with frontend S1-19; route implementation remains S1-08. |
