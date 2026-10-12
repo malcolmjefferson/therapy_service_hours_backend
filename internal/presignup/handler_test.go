@@ -89,6 +89,10 @@ func TestUnknownOrUnverifiedEventsNeverReachDatabase(t *testing.T) {
 		{"PreSignUp_ExternalProvider", "Other_synthetic", "true"},
 		{"PreSignUp_ExternalProvider", "Google_synthetic", "false"},
 		{"PreSignUp_ExternalProvider", "Google_synthetic", ""},
+		{"PreSignUp_ExternalProvider", "google_synthetic", "false"},
+		{"PreSignUp_ExternalProvider", "google_synthetic", ""},
+		{"PreSignUp_ExternalProvider", "google_", "true"},
+		{"PreSignUp_ExternalProvider", "Other_google_synthetic", "true"},
 	} {
 		event := googleEvent()
 		event.TriggerSource, event.UserName = tc.source, tc.username
@@ -97,6 +101,31 @@ func TestUnknownOrUnverifiedEventsNeverReachDatabase(t *testing.T) {
 		handler, _ := presignup.New(check, slog.Default(), true)
 		if _, err := handler.Handle(t.Context(), event); !errors.Is(err, presignup.ErrDenied) || check.calls != 0 {
 			t.Fatalf("unsupported event admitted: %+v", tc)
+		}
+	}
+}
+
+func TestGooglePrefixCasePreservesIdentityAndAllowlist(t *testing.T) {
+	for _, username := range []string{"Google_OpaqueSubject", "google_opaquesubject"} {
+		for _, failure := range []error{nil, domain.ErrForbidden} {
+			event := googleEvent()
+			event.UserName = username
+			check := &checker{err: failure}
+			var logs bytes.Buffer
+			handler, err := presignup.New(check, slog.New(slog.NewJSONHandler(&logs, nil)), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := handler.Handle(t.Context(), event)
+			if check.calls != 1 || (err == nil) != (failure == nil) || (failure != nil && !errors.Is(err, presignup.ErrDenied)) {
+				t.Fatal("Google prefix case changed allowlist enforcement")
+			}
+			if result.UserName != username || result.Response.AutoVerifyEmail || result.Response.AutoConfirmUser {
+				t.Fatal("provider check changed identity or verification flags")
+			}
+			if strings.Contains(logs.String(), username) || strings.Contains(logs.String(), event.Request.UserAttributes["email"]) {
+				t.Fatal("identity leaked into provider decision logs")
+			}
 		}
 	}
 }

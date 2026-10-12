@@ -54,7 +54,7 @@ func (h *Handler) Handle(ctx context.Context, event events.CognitoEventUserPools
 	switch {
 	case h.syntheticAdminUser(event):
 		// The uninvited native test user intentionally exists so S1-06/E2E can prove API denial.
-	case event.TriggerSource == "PreSignUp_ExternalProvider" && strings.HasPrefix(event.UserName, "Google_") && event.Request.UserAttributes["email_verified"] == "true":
+	case event.TriggerSource == "PreSignUp_ExternalProvider" && googleUsername(event.UserName) && event.Request.UserAttributes["email_verified"] == "true":
 		requestCtx, cancel := context.WithTimeout(ctx, RequestBudget)
 		defer cancel()
 		err = h.checker.Check(requestCtx, event.Request.UserAttributes["email"])
@@ -83,6 +83,13 @@ func (h *Handler) Handle(ctx context.Context, event events.CognitoEventUserPools
 		return event, ErrUnavailable
 	}
 	return event, nil
+}
+
+// Cognito lowercases the provider prefix in case-insensitive pools. Preserve the
+// full username in the event and compare only the fixed provider label.
+func googleUsername(username string) bool {
+	const prefix = "Google_"
+	return len(username) > len(prefix) && strings.EqualFold(username[:len(prefix)], prefix)
 }
 
 func (h *Handler) syntheticAdminUser(event events.CognitoEventUserPoolsPreSignup) bool {
