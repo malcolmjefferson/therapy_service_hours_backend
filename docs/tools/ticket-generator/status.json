@@ -1,8 +1,8 @@
 {
-  "updated": "2026-10-11",
+  "updated": "2026-10-12",
   "slices": {
     "S0": "All 21 implementation tickets are merged. Dev delivery is verified by successful pipeline executions, including release `7c97ec40-371c-4387-8c26-817c75450d4c` (data, migration, app, web, frontend sync and smoke). The owner deferred production deployment to M3; production execution, the recorded/manual failure-injection demo and SNS email receipt are not claimed by this update.",
-    "S1": "The accepted plan contains 20 tickets. Core identity/schema/policies are released; seed idempotency and synthetic admission are verified. Gateway/CSP/runtime configuration and browser PKCE preparation are merged and released. Role-authority and admin-recovery evidence are in review. The owner elected to keep the sole dev admin. Auth remains disabled; native fixture creation, actual Google federation, measured p99, live E2E and remaining role-specific shell acceptance are outstanding."
+    "S1": "Enabled dev activation succeeded after the merged registry repair. Pool/client/provider/trigger/public-config checks and real native Gateway/browser acceptance pass; Gateway and CSP tickets are done. The owner elected to retain the sole dev admin. Real Google consent/callback exposed a trigger provider-prefix casing bug; backend #28 prepares its regression fix. Native browser automation is in frontend #22, and role-authority verification remains in backend #25. Actual Google first/repeat binding/logout, cold p99 and remaining role-specific acceptance are outstanding. Prod auth/deploy remain disabled."
   },
   "tickets": {
     "S0-01": {
@@ -183,10 +183,11 @@
     },
     "S1-01": {
       "status": "in progress",
-      "notes": "Cognito pool, Google IdP, clients and typed configuration are merged and synth-tested. The dev secret, matching Google client ID and saved redirect URI were verified. Read-only review verified the three basic identity scopes and External/Testing audience. Auth is disabled and no pool is deployed; activation and live federation verification remain.",
+      "notes": "Dev pool, Google provider, SPA and dev test client are deployed and resource checks pass in 248fa024-49a0-4ebc-bc76-73a236ca9aaa. Real owner Google consent/callback was attempted but rejected before invitation lookup: Cognito lowercases the Google username prefix in this case-insensitive pool. Backend #28 prepares the verified regression fix. First/repeat federation acceptance remains pending; prod stays disabled.",
       "prs": [
-        "infra/32"
-      ]
+        "infra/39"
+      ],
+      "merged": true
     },
     "S1-02": {
       "status": "done",
@@ -199,11 +200,11 @@
     },
     "S1-03": {
       "status": "in progress",
-      "notes": "Backend and infra are merged and released in dev execution 7c97ec40-371c-4387-8c26-817c75450d4c. The arm64 live alias is READY with reserved concurrency 1 and provisioned concurrency 1/1. A synthetic uninvited Google event returned SIGN_UP_NOT_ALLOWED; the decision log had only safe fields and no email. Policy and PostgreSQL tests pass. The single 66 ms sample is not p99 proof; actual federated acceptance and measured cold/warm p99 remain. The pipeline build-list bootstrap issue was repaired before release. Two provisioned cold initialization samples were 2805.16 and 3057.93 ms; these small samples do not establish p99.",
+      "notes": "Warmed live alias and pool-scoped attachment are deployed; real owner sign-in exposed the uppercase-only Google prefix guard. Paired synthetic pending-supervisor events prove Google_ allows and google_ denies on version 3. Backend #28 compares only the provider prefix without case sensitivity, preserving username, verified email, invitation checks and response flags. Actual Google acceptance awaits its release.",
       "prs": [
-        "backend/22",
-        "infra/33"
-      ]
+        "backend/28"
+      ],
+      "merged": false
     },
     "S1-04": {
       "status": "done",
@@ -244,17 +245,18 @@
     "S1-09": {
       "status": "in progress",
       "merged": true,
-      "notes": "Backend #23 and infra #35/#36 are merged and released in successful dev execution 2a38a300-3311-43f7-9552-d07875d6e696. Seeding created three accounts and three invitations; a repeat under the same scoped operator created/renewed none. Synthetic Google events for invited and supervisor fixtures were allowed, while uninvited was denied. Auth remains disabled; the native Cognito fixture phase remains pending.",
+      "notes": "Database seed/admin invitation and three native dev fixtures are deployed. Native profiles and uninvited denial pass against real Gateway; recovery support/sole-admin decision are merged. Database repeat idempotency is verified; a subsequent enabled release must confirm native repeat counts remain zero. First real admin binding awaits the Google prefix repair.",
       "prs": [
         "backend/23",
         "infra/35",
-        "infra/36"
+        "infra/36",
+        "infra/39"
       ]
     },
     "S1-06": {
       "status": "in progress",
       "merged": true,
-      "notes": "Backend #24 is merged and released in successful dev execution af3e6963-7cf5-4857-bfc8-c0a524ba1355. Transactional actor resolution/binding, current database roles/status and the lazy two-connection IAM pool pass race/PostgreSQL/privacy checks. Auth stays disabled; actual Gateway/native/Google token acceptance remains with S1-14 and activation.",
+      "notes": "Backend identity/binding is merged and released. Real native tokens resolve invited profiles and deny uninvited accounts; transactional and privacy/race tests pass. Real Google first/repeat binding remains pending the trigger prefix repair in backend #28.",
       "prs": [
         "backend/24"
       ]
@@ -270,25 +272,28 @@
     "S1-08": {
       "status": "in progress",
       "merged": true,
-      "notes": "Backend #24 is merged and released. The explicit /me DTO, no-store JSON and stable 401/403 problems pass schema/privacy tests; deployed unauthenticated /me returns 401 problem+json. Actual authenticated Gateway acceptance remains pending with activation.",
+      "notes": "Backend profile endpoint is merged/released and passes actual native-token 200/403 with the explicit DTO and no-store behavior. The invited name renders in the deployed UI and uninvited users see access denied. Real Google owner profile acceptance awaits backend #28.",
       "prs": [
         "backend/24"
       ]
     },
     "S1-14": {
-      "status": "in progress",
+      "status": "done",
       "merged": true,
-      "notes": "Infra #37 is merged and released in successful dev execution 3572ade1-29e7-4486-bafa-50581759b998; paired frontend #21 is released in ab156fe8-0a32-420e-b18c-48a2b6dcc691. Gateway JWT routes, audiences and scoped native token gates are implemented. Auth stays disabled; authenticated acceptance awaits activation.",
+      "notes": "Dev activation 248fa024-49a0-4ebc-bc76-73a236ca9aaa succeeded after the official-registry repair. Live Gateway/native smoke passes invited /me 200, uninvited 403, authenticated unknown 404 and unauthenticated 401; health remains public. Exactly one public route, issuer/audiences and scoped reader are asserted. Actual Google federation is separate and needs backend #28's lowercase-provider fix.",
       "prs": [
-        "infra/37"
+        "infra/37",
+        "infra/39",
+        "backend/27"
       ]
     },
     "S1-16": {
-      "status": "in progress",
+      "status": "done",
       "merged": true,
-      "notes": "Infra #37 and frontend #21 are merged and released successfully in ab156fe8-0a32-420e-b18c-48a2b6dcc691. Exact Cognito CSP origin and validated no-store public runtime settings pass release header/browser smoke. Enabled auth runtime acceptance awaits activation.",
+      "notes": "Released in successful enabled-dev activation 248fa024-49a0-4ebc-bc76-73a236ca9aaa. Exact Cognito CSP and no-store public issuer/client/callback/logout settings are verified, with no credential fields. Release header/browser checks and native dev browser flows pass. Prod remains disabled.",
       "prs": [
         "infra/37",
+        "infra/39",
         "frontend/21"
       ]
     },
@@ -317,13 +322,29 @@
       "notes": "PostgreSQL regression tests reuse unchanged trusted claims after database admin/supervisor removal and deactivation, and reject token-group elevation for ordinary users. Role-authority runbook documents next-request enforcement, in-flight request timing and S5-05 Cognito follow-up. Review/merge remains pending; actual Gateway token acceptance is separately gated on activation."
     },
     "S1-20": {
-      "status": "in review",
-      "merged": false,
-      "notes": "Additional-admin recovery is verified against PostgreSQL in dev and explicitly opted-in prod: original binding/history preserved, repeat idempotent, missing prod flag makes no writes. Runbook has exact scoped Lambda invocation and failure handling. Owner decided 2026-10-11 to retain the sole dev admin; no additional live identity is seeded. Review/merge remains pending; no live recovery drill is claimed.",
+      "status": "done",
+      "merged": true,
+      "notes": "Backend #26 and infra #38 are merged. PostgreSQL recovery tests preserve the first bound admin/history, are idempotent and require explicit prod opt-in. The runbook gives exact additional-admin invocation and safe failure handling. Owner explicitly elected to retain the sole dev admin; no second live identity or live recovery drill is claimed.",
       "prs": [
         "backend/26",
         "infra/38"
       ]
+    },
+    "S1-13": {
+      "status": "in progress",
+      "merged": false,
+      "prs": [
+        "frontend/22"
+      ],
+      "notes": "Frontend #22 prepares the release native-browser cases and passes all CI checks. Both native cases ran successfully against enabled dev: real Gateway/backend invited 200 and uninvited 403 relayed unchanged into deployed UI, native revocation, safe storage and no token-group role elevation. Google protocol/hosted logout are intercepted; no auth bypass is shipped. Release automation after merge and recorded real Google first/repeat sign-in/logout remain pending the prefix repair."
+    },
+    "S1-18": {
+      "status": "in progress",
+      "merged": false,
+      "prs": [
+        "backend/28"
+      ],
+      "notes": "Live owner Google attempt exposed the case-insensitive provider-prefix bug, reproduced with a still-pending fictional supervisor invitation. Native/resource acceptance passes. 100 direct synthetic alias invocations produced expected admission outcomes; excluding one initialization-containing log tail leaves 99 warm samples with REPORT p50 3.03 ms, p95 43.17 ms and p99/max 54.37 ms. This is not actual federation or cold p99 proof; real first/repeat binding and representative cold measurements remain pending."
     }
   }
 }
