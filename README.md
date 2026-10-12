@@ -41,6 +41,13 @@ and PostgreSQL integration tests exercise the protected flow with fictional Gate
 
 **Windows with Docker Desktop:** run `export TESTCONTAINERS_RYUK_DISABLED=true` (Git Bash) before `go test`, or the integration tests time out starting Testcontainers' Ryuk container.
 
+Integration tests pull the official PostgreSQL 17 image from ECR Public and the
+Testcontainers cleanup image from its publisher's GHCR registry. This avoids Docker
+Hub's anonymous pull limit on shared build runners without skipping database tests
+or disabling cleanup in CI. An explicit `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX` is
+preserved for operators using their own registry mirror. No registry credentials
+or private ECR repository are required.
+
 ## Commands
 
 Requires Go 1.27 (pinned in `go.mod`).
