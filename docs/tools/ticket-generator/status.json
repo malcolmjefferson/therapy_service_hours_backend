@@ -1,8 +1,8 @@
 {
-  "updated": "2026-10-11",
+  "updated": "2026-10-12",
   "slices": {
     "S0": "All 21 implementation tickets are merged. Dev delivery is verified by successful pipeline executions, including release `7c97ec40-371c-4387-8c26-817c75450d4c` (data, migration, app, web, frontend sync and smoke). The owner deferred production deployment to M3; production execution, the recorded/manual failure-injection demo and SNS email receipt are not claimed by this update.",
-    "S1": "Core identity/schema/policies and paired Gateway/browser preparation are released. Additional-admin recovery is merged, with the owner retaining the sole dev admin. Role-authority verification remains in review. Dev-only auth activation is prepared; live native/Google token acceptance, actual federation, measured p99 and remaining role-specific browser acceptance await release. Prod auth and production deployment remain disabled until M3."
+    "S1": "Dev-only activation infra #39 and official-registry build repair backend #27 are merged; prod auth/deploy remain disabled. The first activation failed before deployment at Docker Hub's anonymous pull limit; a new source release is in progress. Core identity and paired browser/Gateway preparation are released; recovery is merged and the owner retains the sole dev admin. Native browser acceptance is prepared, while live native/Google sign-in, measured p99 and the manual demo await activation. Backend #25 remains in review and is kept current with merged work."
   },
   "tickets": {
     "S0-01": {
@@ -183,11 +183,11 @@
     },
     "S1-01": {
       "status": "in progress",
-      "notes": "Pool/Google/client implementation from infra #32 is merged. Dev-only activation is prepared after the successful paired Gateway/browser releases; prod auth/deploy remain disabled. Current Google secret and warmed alias prerequisites are verified. Pool creation and actual Google acceptance remain pending the activation release.",
+      "notes": "Pool/Google/client implementation from infra #32 is merged. Dev-only activation is prepared after the successful paired Gateway/browser releases; prod auth/deploy remain disabled. Current Google secret and warmed alias prerequisites are verified. Pool creation and actual Google acceptance remain pending the activation release. Infra #39 and backend #27 are merged. The first activation failed before deployment at Docker Hub's anonymous PostgreSQL pull limit; the official-registry repair passes all ten CI gates. New activation execution 248fa024-49a0-4ebc-bc76-73a236ca9aaa is in progress. Live acceptance remains pending deployment.",
       "prs": [
         "infra/39"
       ],
-      "merged": false
+      "merged": true
     },
     "S1-02": {
       "status": "done",
@@ -200,11 +200,11 @@
     },
     "S1-03": {
       "status": "in progress",
-      "notes": "Backend trigger and infra attachment are merged. Latest preflight live alias version 3 is READY at 1/1; synthetic external-provider invited admission passes and uninvited denies SIGN_UP_NOT_ALLOWED. Dev activation is prepared; actual federation and measured p99 remain S1-18 acceptance.",
+      "notes": "Backend trigger and infra attachment are merged. Latest preflight live alias version 3 is READY at 1/1; synthetic external-provider invited admission passes and uninvited denies SIGN_UP_NOT_ALLOWED. Dev activation is prepared; actual federation and measured p99 remain S1-18 acceptance. Infra #39 and backend #27 are merged. The first activation failed before deployment at Docker Hub's anonymous PostgreSQL pull limit; the official-registry repair passes all ten CI gates. New activation execution 248fa024-49a0-4ebc-bc76-73a236ca9aaa is in progress. Live acceptance remains pending deployment.",
       "prs": [
         "infra/39"
       ],
-      "merged": false
+      "merged": true
     },
     "S1-04": {
       "status": "done",
@@ -244,8 +244,8 @@
     },
     "S1-09": {
       "status": "in progress",
-      "merged": false,
-      "notes": "Seed implementation is merged/released with verified DB idempotency. S1-20 recovery support and sole-admin owner decision are complete. Dev activation prepares native fixture/credential creation; those writes and authenticated acceptance await release.",
+      "merged": true,
+      "notes": "Seed implementation is merged/released with verified DB idempotency. S1-20 recovery support and sole-admin owner decision are complete. Dev activation prepares native fixture/credential creation; those writes and authenticated acceptance await release. Infra #39 and backend #27 are merged. The first activation failed before deployment at Docker Hub's anonymous PostgreSQL pull limit; the official-registry repair passes all ten CI gates. New activation execution 248fa024-49a0-4ebc-bc76-73a236ca9aaa is in progress. Live acceptance remains pending deployment.",
       "prs": [
         "infra/39"
       ]
@@ -276,16 +276,16 @@
     },
     "S1-14": {
       "status": "in progress",
-      "merged": false,
-      "notes": "Gateway implementation from infra #37 is merged/released. Dev activation is prepared with exactly one public health route, issuer/SPA+dev-test audiences and scoped native token checks. Live authenticated Gateway acceptance awaits the activation release.",
+      "merged": true,
+      "notes": "Gateway implementation from infra #37 is merged/released. Dev activation is prepared with exactly one public health route, issuer/SPA+dev-test audiences and scoped native token checks. Live authenticated Gateway acceptance awaits the activation release. Infra #39 and backend #27 are merged. The first activation failed before deployment at Docker Hub's anonymous PostgreSQL pull limit; the official-registry repair passes all ten CI gates. New activation execution 248fa024-49a0-4ebc-bc76-73a236ca9aaa is in progress. Live acceptance remains pending deployment.",
       "prs": [
         "infra/39"
       ]
     },
     "S1-16": {
       "status": "in progress",
-      "merged": false,
-      "notes": "Exact Cognito CSP and public runtime config from infra #37/frontend #21 are merged/released. Activation switches dev runtime config to deployed pool/client outputs with no-store; prod remains disabled. Live enabled acceptance awaits release.",
+      "merged": true,
+      "notes": "Exact Cognito CSP and public runtime config from infra #37/frontend #21 are merged/released. Activation switches dev runtime config to deployed pool/client outputs with no-store; prod remains disabled. Live enabled acceptance awaits release. Infra #39 and backend #27 are merged. The first activation failed before deployment at Docker Hub's anonymous PostgreSQL pull limit; the official-registry repair passes all ten CI gates. New activation execution 248fa024-49a0-4ebc-bc76-73a236ca9aaa is in progress. Live acceptance remains pending deployment.",
       "prs": [
         "infra/39"
       ]
@@ -322,6 +322,14 @@
         "backend/26",
         "infra/38"
       ]
+    },
+    "S1-13": {
+      "status": "in progress",
+      "merged": false,
+      "prs": [
+        "frontend/22"
+      ],
+      "notes": "Prepared enabled-dev Playwright tests: real native-client authentication and real Gateway/backend profile responses are relayed into the deployed UI; Google protocol and hosted logout are intercepted. Tokens stay in the runner with private CLI inputs, cleanup/revocation and no trace/screenshots/video. Local protocol/regression and redaction guards are verified. Actual enabled-dev browser runs and the recorded manual Google demo remain pending activation."
     }
   }
 }
