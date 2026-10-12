@@ -79,7 +79,23 @@ latency risk that is bounded and measured rather than discovered during the demo
   error code; an invited email with a pending unexpired invitation passes.
 - S1-17: negative test that `presignup_ro` cannot write.
 
-## Open items
+## Partial dev measurement (2026-10-12, S1-18)
+
+One hundred sequential, direct synthetic invocations of `presignup:live` version 3
+produced the expected invited/refused decisions. One log tail contained initialization;
+excluding it leaves 99 warm samples. Lambda REPORT durations were p50 **3.03 ms**,
+p95 **43.17 ms**, and nearest-rank p99/max **54.37 ms**. The initialized observation's
+reported invocation duration was 625.29 ms. Inputs used fixed fictional fixtures;
+only case, version and durations were retained.
+
+This is a warm synthetic admission measurement, not actual Google federation,
+end-to-end Cognito latency or a cold-start p99 distribution. The actual Google
+attempt exposed the provider-prefix case bug recorded in ADR-0008. S1-18 remains
+in progress until that fix is released, first/repeat federation is verified and
+representative cold measurements are recorded. Memory stays at the approved 128 MiB
+with reserved/provisioned concurrency 1; no resource settings changed for sampling.
+
+## Remaining open items
 
 - Decide the exact memory size for the trigger, which sets the provisioned-concurrency cost.
 - Revisit when prod is enabled at M3: two environments means two reservations.

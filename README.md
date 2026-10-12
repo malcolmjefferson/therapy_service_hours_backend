@@ -138,6 +138,13 @@ seeded admin binding, role revocation, deactivation, changed email, expired/revo
 cross-org guards, SQL metacharacters, DTO schema and log privacy. Actual Gateway issuer/audience
 validation and live Google/native-token `/me` checks remain S1-14/activation acceptance.
 
+The Google invitation trigger accepts either casing of the fixed `Google_` provider
+prefix, because Cognito lowercases it in a case-insensitive pool. It requires a
+nonempty username suffix, the external-provider event and a verified email before
+checking the pending invitation; it never rewrites the identity or changes email
+verification flags. [AWS username mapping behavior](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-specifying-attribute-mapping.html)
+is covered by positive/negative regression tests.
+
 The pre-sign-up database role (`presignup_ro`, S1-17) has IAM login, CONNECT, schema USAGE and
 SELECT on exactly `users` and `invitations`. Bootstrap creates the role before migration; migration
 00002 supplies exact table grants, and bootstrap can grant them if the tables already exist.
