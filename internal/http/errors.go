@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/authn"
 )
 
 // problemFor maps an error to its problem response. It is the only place domain errors become
@@ -14,6 +15,8 @@ func problemFor(err error) Problem {
 	var verr *domain.ValidationError
 	var maxErr *http.MaxBytesError
 	switch {
+	case errors.Is(err, authn.ErrUnauthorized):
+		return Problem{Type: ProblemUnauthorized, Title: "Unauthorized", Status: http.StatusUnauthorized}
 	case errors.As(err, &maxErr):
 		return bodyTooLarge(maxErr.Limit)
 	case errors.As(err, &verr):
@@ -40,8 +43,13 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	level := slog.LevelInfo
 	if p.Status >= http.StatusInternalServerError {
 		level = slog.LevelError
+	} else if p.Status == http.StatusForbidden || p.Status == http.StatusUnauthorized {
+		level = slog.LevelWarn
+	}
+	if p.Status == http.StatusUnauthorized {
+		w.Header().Set("WWW-Authenticate", "Bearer")
 	}
 	LoggerFrom(r.Context()).LogAttrs(r.Context(), level, "request failed",
-		slog.Int("status", p.Status), slog.String("problem", string(p.Type)), slog.String("error", err.Error()))
+		slog.Int("status", p.Status), slog.String("problem", string(p.Type)), slog.String("action", "api_request"), slog.String("resource_type", "user"), slog.String("actor_id", ActorFrom(r.Context()).ID))
 	writeProblem(w, r, p)
 }

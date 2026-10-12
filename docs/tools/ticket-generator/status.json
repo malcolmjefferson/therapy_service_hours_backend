@@ -2,7 +2,7 @@
   "updated": "2026-10-11",
   "slices": {
     "S0": "All 21 implementation tickets are merged. Dev delivery is verified by successful pipeline executions, including release `7c97ec40-371c-4387-8c26-817c75450d4c` (data, migration, app, web, frontend sync and smoke). The owner deferred production deployment to M3; production execution, the recorded/manual failure-injection demo and SNS email receipt are not claimed by this update.",
-    "S1": "The accepted plan contains 20 tickets. ADR-0008–0011 are owner-approved; the identity schema, restricted database role, claims adapter and paired /me contracts are released. The invitation trigger is deployed with its live alias READY at provisioned concurrency 1/1 and a verified synthetic uninvited denial. Cognito remains disabled. Google scopes and External/Testing audience are verified. Pool activation, actual Google federation, measured cold/warm p99, actor authorization, seeding and the frontend sign-in flow remain outstanding."
+    "S1": "The accepted plan contains 20 tickets. ADR-0008\u20130011, schema, restricted database role, claims adapter and paired /me contracts are released. Database seed idempotency and synthetic invited/uninvited admission are verified on dev; trigger provisioned concurrency is READY at 1/1. Backend actor resolution, authorization policies and /me implementation are prepared for review. Cognito remains disabled. Native fixture creation, Gateway authorizer, actual Google federation, measured p99 and frontend sign-in remain outstanding."
   },
   "tickets": {
     "S0-01": {
@@ -16,7 +16,7 @@
     },
     "S0-02": {
       "status": "done",
-      "notes": "Accepted ADR-0001–0006 and owner decisions are reflected in the shared specification.",
+      "notes": "Accepted ADR-0001\u20130006 and owner decisions are reflected in the shared specification.",
       "prs": [
         "backend/6",
         "frontend/3",
@@ -119,7 +119,7 @@
     },
     "S0-15": {
       "status": "done",
-      "notes": "Dev data → migration → app → web → frontend sync → smoke completed successfully. Concurrency preflight is deployed.",
+      "notes": "Dev data \u2192 migration \u2192 app \u2192 web \u2192 frontend sync \u2192 smoke completed successfully. Concurrency preflight is deployed.",
       "prs": [
         "infra/17",
         "infra/27"
@@ -190,7 +190,7 @@
     },
     "S1-02": {
       "status": "done",
-      "notes": "Owner accepted ADR-0008–0011 on 2026-10-11; decisions are merged in all three repositories. Live binding and latency proof are separate S1-18 acceptance work.",
+      "notes": "Owner accepted ADR-0008\u20130011 on 2026-10-11; decisions are merged in all three repositories. Live binding and latency proof are separate S1-18 acceptance work.",
       "prs": [
         "backend/17",
         "frontend/18",
@@ -243,11 +243,36 @@
     },
     "S1-09": {
       "status": "in progress",
-      "merged": false,
-      "notes": "Started as the prerequisite for S1-01/S1-03 activation and admission acceptance. The backend seed service and paired infra dev step are prepared and locally tested: operator-only requests, production guards, transaction rollback, idempotency and safe logs. The owner selected the first dev admin. Auth remains disabled. Release build-discovery before backend seed, then infra; live seed rerun and admission verification remain pending.",
+      "merged": true,
+      "notes": "Backend #23 and infra #35/#36 are merged and released in successful dev execution 2a38a300-3311-43f7-9552-d07875d6e696. Seeding created three accounts and three invitations; a repeat under the same scoped operator created/renewed none. Synthetic Google events for invited and supervisor fixtures were allowed, while uninvited was denied. Auth remains disabled; the native Cognito fixture phase remains pending.",
       "prs": [
         "backend/23",
-        "infra/35"
+        "infra/35",
+        "infra/36"
+      ]
+    },
+    "S1-06": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "Backend actor resolution is prepared and tested: trusted ID-token claims only, atomic invitation provisioning/subject binding/acceptance, current database roles/status, and a lazy two-connection IAM pool. Concurrent identity conflicts, rollback, deactivation and privacy are covered by PostgreSQL and adapter tests. Auth remains disabled; S1-14 Gateway integration and authenticated deployment acceptance remain pending.",
+      "prs": [
+        "backend/24"
+      ]
+    },
+    "S1-07": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "Central deny-by-default policies are prepared: active self access, database admin/supervisor predicates and same-org accepted supervision/peer relationships. Admin status cannot bypass a supervision link; relationship errors fail closed. The /me handler demonstrates the policy call. Implementation review remains; later slices supply relationship storage.",
+      "prs": [
+        "backend/24"
+      ]
+    },
+    "S1-08": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "The existing /me contract is implemented with an explicit current-user DTO, empty roles array for ordinary users, no-store JSON and stable 401/403 problems. Schema, privacy and negative identity tests pass. Live Gateway/native/Google token acceptance remains pending with S1-14 and activation.",
+      "prs": [
+        "backend/24"
       ]
     }
   }

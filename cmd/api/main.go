@@ -14,12 +14,14 @@ import (
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/apigw"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/config"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/db"
 	httpapi "github.com/malcolmjefferson/therapy_service_hours_backend/internal/http"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/authn"
 )
 
 func main() {
 	if err := run(); err != nil {
-		slog.New(slog.NewJSONHandler(os.Stderr, nil)).Error("api failed to start", slog.String("error", err.Error()))
+		slog.New(slog.NewJSONHandler(os.Stderr, nil)).Error("api failed to start", slog.String("code", "API_INITIALIZATION_FAILED"))
 		os.Exit(1)
 	}
 }
@@ -31,13 +33,27 @@ func run() error {
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel})).
 		With(slog.String("function", cfg.Function))
+	database, err := config.LoadDatabase(os.LookupEnv)
+	if err != nil {
+		return err
+	}
+	if cfg.LocalHTTPAddr == "" && (database.AuthMode != "iam" || database.User != "app_rw") {
+		return errors.New("API requires app_rw IAM authentication")
+	}
+	store := &lazyDatabase{cfg: database}
+	defer store.close()
+	identity, err := authn.New(db.NewIdentityStore(store), time.Now)
+	if err != nil {
+		return err
+	}
 
 	router, err := httpapi.NewRouter(httpapi.RouterDeps{
-		Logger:       logger,
-		Version:      cfg.Version,
-		MaxBodyBytes: cfg.MaxBodyBytes,
-		NewRequestID: httpapi.RandomID,
-		Now:          time.Now,
+		Logger:        logger,
+		Version:       cfg.Version,
+		MaxBodyBytes:  cfg.MaxBodyBytes,
+		NewRequestID:  httpapi.RandomID,
+		Now:           time.Now,
+		ActorResolver: identity,
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/apigw"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/authn"
 )
 
 // RequireAuthorizerClaims refuses protected requests without validated Gateway identity.
@@ -15,8 +16,7 @@ func RequireAuthorizerClaims(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := apigw.JWTClaimsFrom(r.Context())
 		if !ok || strings.TrimSpace(claims["sub"]) == "" {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			writeProblem(w, r, Problem{Type: ProblemUnauthorized, Title: "Unauthorized", Status: http.StatusUnauthorized})
+			WriteError(w, r, authn.ErrUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
