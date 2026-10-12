@@ -2,7 +2,7 @@
   "updated": "2026-10-11",
   "slices": {
     "S0": "All 21 implementation tickets are merged. Dev delivery is verified by successful pipeline executions, including release `7c97ec40-371c-4387-8c26-817c75450d4c` (data, migration, app, web, frontend sync and smoke). The owner deferred production deployment to M3; production execution, the recorded/manual failure-injection demo and SNS email receipt are not claimed by this update.",
-    "S1": "The accepted plan contains 20 tickets. ADR-0008\u20130011, schema, restricted database role, claims adapter and paired /me contracts are released. Database seed idempotency and synthetic invited/uninvited admission are verified on dev; trigger provisioned concurrency is READY at 1/1. Backend actor resolution, authorization policies and /me implementation are prepared for review. Cognito remains disabled. Native fixture creation, Gateway authorizer, actual Google federation, measured p99 and frontend sign-in remain outstanding."
+    "S1": "The accepted plan contains 20 tickets. ADRs, schema, read-only trigger role, claims adapter, profile contracts and central authorization policies are merged. Backend identity/profile implementation is released; database seed idempotency and synthetic admission are verified. Gateway protection, CSP/runtime settings and browser PKCE sign-in are prepared for paired review. Auth remains disabled. Native fixture creation, real Google federation, measured p99, live E2E and the remaining role-specific shell work are outstanding."
   },
   "tickets": {
     "S0-01": {
@@ -253,27 +253,66 @@
     },
     "S1-06": {
       "status": "in progress",
-      "merged": false,
-      "notes": "Backend actor resolution is prepared and tested: trusted ID-token claims only, atomic invitation provisioning/subject binding/acceptance, current database roles/status, and a lazy two-connection IAM pool. Concurrent identity conflicts, rollback, deactivation and privacy are covered by PostgreSQL and adapter tests. Auth remains disabled; S1-14 Gateway integration and authenticated deployment acceptance remain pending.",
+      "merged": true,
+      "notes": "Backend #24 is merged and released in successful dev execution af3e6963-7cf5-4857-bfc8-c0a524ba1355. Transactional actor resolution/binding, current database roles/status and the lazy two-connection IAM pool pass race/PostgreSQL/privacy checks. Auth stays disabled; actual Gateway/native/Google token acceptance remains with S1-14 and activation.",
       "prs": [
         "backend/24"
       ]
     },
     "S1-07": {
-      "status": "in progress",
-      "merged": false,
-      "notes": "Central deny-by-default policies are prepared: active self access, database admin/supervisor predicates and same-org accepted supervision/peer relationships. Admin status cannot bypass a supervision link; relationship errors fail closed. The /me handler demonstrates the policy call. Implementation review remains; later slices supply relationship storage.",
+      "status": "done",
+      "merged": true,
+      "notes": "Backend #24 is merged and released. Central active-actor, same-org self/admin/supervisor/peer policies deny by default, require accepted relationships and reject storage errors. Admin grants no supervision override. /me demonstrates the handler policy call; later slices implement relationship storage.",
       "prs": [
         "backend/24"
       ]
     },
     "S1-08": {
       "status": "in progress",
-      "merged": false,
-      "notes": "The existing /me contract is implemented with an explicit current-user DTO, empty roles array for ordinary users, no-store JSON and stable 401/403 problems. Schema, privacy and negative identity tests pass. Live Gateway/native/Google token acceptance remains pending with S1-14 and activation.",
+      "merged": true,
+      "notes": "Backend #24 is merged and released. The explicit /me DTO, no-store JSON and stable 401/403 problems pass schema/privacy tests; deployed unauthenticated /me returns 401 problem+json. Actual authenticated Gateway acceptance remains pending with activation.",
       "prs": [
         "backend/24"
       ]
+    },
+    "S1-14": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "Prepared Gateway JWT authorizer with issuer and SPA/dev-only test audiences; exactly one public health route is asserted for enabled environments. No-token release checks and scoped native invited/uninvited /me plus authenticated unknown-path checks are prepared. Default auth remains disabled; live activation acceptance is pending.",
+      "prs": [
+        "infra/37"
+      ]
+    },
+    "S1-16": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "Prepared exact Cognito origin in CloudFront and local CSP, strict header assertions, and no unsafe directives. Public runtime auth settings are validated, uploaded without caching and invalidated with index.html. Paired infra/frontend release and live activation remain pending.",
+      "prs": [
+        "infra/37",
+        "frontend/21"
+      ]
+    },
+    "S1-10": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "Prepared code/PKCE browser flow with state/nonce validation, callback URL cleanup, memory-only tokens, single-flight refresh and revocation plus hosted logout. 401/403 handling clears private cache and routes safely. Unit and intercepted browser tests cover replay, reload, refresh races, logout and denied profiles. Real Google sign-in/sign-out remain pending after activation.",
+      "prs": [
+        "frontend/21"
+      ]
+    },
+    "S1-11": {
+      "status": "in progress",
+      "merged": false,
+      "notes": "Prepared themed signed-out landing, account-name menu, current profile and access-denied views. Serious accessibility checks and browser flows pass. Navigation for future role-specific feature pages and actual dev sign-in acceptance remain pending.",
+      "prs": [
+        "frontend/21"
+      ]
+    },
+    "S1-12": {
+      "status": "in review",
+      "merged": false,
+      "prs": [],
+      "notes": "PostgreSQL regression tests reuse unchanged trusted claims after database admin/supervisor removal and deactivation, and reject token-group elevation for ordinary users. Role-authority runbook documents next-request enforcement, in-flight request timing and S5-05 Cognito follow-up. Review/merge remains pending; actual Gateway token acceptance is separately gated on activation."
     }
   }
 }

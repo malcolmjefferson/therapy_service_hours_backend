@@ -9,6 +9,7 @@ Go API (AWS Lambda), migrations, SQL queries and the **OpenAPI contract** (`api/
 - **Decisions:** [docs/adr/](docs/adr/README.md)
 - **Backlog:** [docs/jira/](docs/jira/README.md)
 - **Operations** (deploy, alarms, restore, adding a migration): [infra runbook](https://github.com/malcolmjefferson/therapy_service_hours_infra/blob/main/docs/runbook.md)
+- **Role revocation and token staleness:** [role-authority runbook](docs/runbooks/role-authority.md)
 
 ## Quick start (new developer)
 
