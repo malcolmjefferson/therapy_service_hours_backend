@@ -255,19 +255,25 @@
       "status": "in progress",
       "merged": false,
       "notes": "Backend actor resolution is prepared and tested: trusted ID-token claims only, atomic invitation provisioning/subject binding/acceptance, current database roles/status, and a lazy two-connection IAM pool. Concurrent identity conflicts, rollback, deactivation and privacy are covered by PostgreSQL and adapter tests. Auth remains disabled; S1-14 Gateway integration and authenticated deployment acceptance remain pending.",
-      "prs": []
+      "prs": [
+        "backend/24"
+      ]
     },
     "S1-07": {
       "status": "in progress",
       "merged": false,
       "notes": "Central deny-by-default policies are prepared: active self access, database admin/supervisor predicates and same-org accepted supervision/peer relationships. Admin status cannot bypass a supervision link; relationship errors fail closed. The /me handler demonstrates the policy call. Implementation review remains; later slices supply relationship storage.",
-      "prs": []
+      "prs": [
+        "backend/24"
+      ]
     },
     "S1-08": {
       "status": "in progress",
       "merged": false,
       "notes": "The existing /me contract is implemented with an explicit current-user DTO, empty roles array for ordinary users, no-store JSON and stable 401/403 problems. Schema, privacy and negative identity tests pass. Live Gateway/native/Google token acceptance remains pending with S1-14 and activation.",
-      "prs": []
+      "prs": [
+        "backend/24"
+      ]
     }
   }
 }

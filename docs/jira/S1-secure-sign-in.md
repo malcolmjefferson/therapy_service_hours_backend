@@ -478,6 +478,8 @@ The drift gate compares the pinned spec to the backend spec byte for byte (scrip
 
 Backend actor resolution is prepared and tested: trusted ID-token claims only, atomic invitation provisioning/subject binding/acceptance, current database roles/status, and a lazy two-connection IAM pool. Concurrent identity conflicts, rollback, deactivation and privacy are covered by PostgreSQL and adapter tests. Auth remains disabled; S1-14 Gateway integration and authenticated deployment acceptance remain pending.
 
+Open PRs: [backend #24](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/24).
+
 **Description**
 
 Wire the pgx pool into cmd/api, which has no database today, then resolve the actor from the validated claims in the authorizer context: look the user up by the claim ADR-0008 chose, bind cognito_sub on first sign-in inside one transaction, provision the users row from a pending invitation on first sign-in and stamp invitations.accepted_at (ADR-0010), refuse deactivated users, and take roles from the users row only. Group claims are advisory in S1 because nothing assigns Cognito groups until S5-05, and the seeded first admin has no Cognito user at all until they first sign in.
@@ -518,6 +520,8 @@ Wire the pgx pool into cmd/api, which has no database today, then resolve the ac
 
 Central deny-by-default policies are prepared: active self access, database admin/supervisor predicates and same-org accepted supervision/peer relationships. Admin status cannot bypass a supervision link; relationship errors fail closed. The /me handler demonstrates the policy call. Implementation review remains; later slices supply relationship storage.
 
+Open PRs: [backend #24](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/24).
+
 **Description**
 
 Central policy package: Actor type, role predicates, relationship checks interface (same org, supervisor-of), helper that handlers must call; lint/test that handlers reference authz.
@@ -556,6 +560,8 @@ Central policy package: Actor type, role predicates, relationship checks interfa
 **Completion / progress**
 
 The existing /me contract is implemented with an explicit current-user DTO, empty roles array for ordinary users, no-store JSON and stable 401/403 problems. Schema, privacy and negative identity tests pass. Live Gateway/native/Google token acceptance remains pending with S1-14 and activation.
+
+Open PRs: [backend #24](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/24).
 
 **Description**
 
