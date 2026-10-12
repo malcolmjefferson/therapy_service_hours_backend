@@ -23,6 +23,8 @@ type RouterDeps struct {
 	NewRequestID IDGenerator
 	// Now is the clock used for request durations.
 	Now Clock
+	// ActorResolver authenticates protected routes; health never calls it.
+	ActorResolver ActorResolver
 }
 
 func (d RouterDeps) validate() error {
@@ -42,6 +44,9 @@ func (d RouterDeps) validate() error {
 	if d.Now == nil {
 		errs = append(errs, errors.New("clock is required"))
 	}
+	if d.ActorResolver == nil {
+		errs = append(errs, errors.New("actor resolver is required"))
+	}
 	return errors.Join(errs...)
 }
 
@@ -51,7 +56,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, err
 	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version})
+	mountAPI(r, &server{version: deps.Version}, deps.ActorResolver)
 	return r, nil
 }
 

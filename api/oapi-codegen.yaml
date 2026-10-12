@@ -8,6 +8,3 @@ generate:
   embedded-spec: true
 output-options:
   skip-prune: true
-  # S1-05 publishes the contract before S1-08 implements its route. Generate the
-  # models now; remove this filter in S1-08 to require the strict server method.
-  exclude-operation-ids: [getMe]

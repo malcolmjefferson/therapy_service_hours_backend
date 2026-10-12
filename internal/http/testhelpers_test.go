@@ -2,12 +2,15 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
 )
 
 // logSink collects JSON log lines written during a test.
@@ -50,7 +53,16 @@ func testDeps(sink *logSink) RouterDeps {
 		MaxBodyBytes: 16,
 		NewRequestID: func() string { return "generated-id" },
 		Now:          func() time.Time { return start },
+		ActorResolver: resolverFunc(func(context.Context, map[string]string) (domain.Actor, error) {
+			return domain.Actor{}, domain.ErrForbidden
+		}),
 	}
+}
+
+type resolverFunc func(context.Context, map[string]string) (domain.Actor, error)
+
+func (f resolverFunc) Resolve(ctx context.Context, claims map[string]string) (domain.Actor, error) {
+	return f(ctx, claims)
 }
 
 // decodeProblem parses a problem+json body.

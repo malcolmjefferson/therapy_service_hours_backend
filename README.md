@@ -27,10 +27,15 @@ git clone https://github.com/malcolmjefferson/therapy_service_hours_backend.git
 cd therapy_service_hours_backend
 git config core.hooksPath .githooks   # once per clone: the pre-commit hook blocks commits with secrets (and when gitleaks is missing)
 go test ./...                          # unit + integration tests; first run downloads the toolchain and the Postgres image
-APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 go run ./cmd/api
+APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 DB_HOST=127.0.0.1 DB_NAME=therapy_service_hours DB_USER=app_rw DB_AUTH=iam AWS_REGION=us-west-2 go run ./cmd/api
 ```
 
 Then open http://127.0.0.1:8080/api/v1/healthz: `{"status":"ok","version":"local"}`. The frontend's dev server (`npm run dev`) proxies `/api` to this address.
+
+Health and requests without trusted claims do not open the database. Supply a local PostgreSQL
+container's `DB_AUTH=password` and `DB_PASSWORD` for database-backed development; never use those
+settings in Lambda. Local HTTP cannot synthesize authenticated claims through headers. Adapter
+and PostgreSQL integration tests exercise the protected flow with fictional Gateway events.
 
 **Windows with Docker Desktop:** run `export TESTCONTAINERS_RYUK_DISABLED=true` (Git Bash) before `go test`, or the integration tests time out starting Testcontainers' Ryuk container.
 
@@ -44,7 +49,7 @@ Requires Go 1.27 (pinned in `go.mod`).
 | `go vet ./...` | Static checks |
 | `go generate ./...` | Regenerate `internal/http/gen` from `api/openapi.yaml` |
 | `scripts/check-generated.sh`, `scripts/check-spectral.sh`, `scripts/check-breaking.sh` | API contract gates; see [api/README.md](api/README.md) |
-| `APP_VERSION=local LOCAL_HTTP_ADDR=127.0.0.1:8080 go run ./cmd/api` | Serve the API locally; then open `http://127.0.0.1:8080/api/v1/healthz` |
+| `go run ./cmd/api` | With the configuration above, serve locally; health never connects to PostgreSQL |
 | `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bootstrap ./cmd/api` | Build one Lambda binary (`provided.al2023`, arm64) |
 
 ## Build the Lambdas
@@ -52,7 +57,9 @@ Requires Go 1.27 (pinned in `go.mod`).
 The pipeline builds every Lambda; a manual deploy (see the [runbook](https://github.com/malcolmjefferson/therapy_service_hours_infra/blob/main/docs/runbook.md#2-deploy-flow)) needs the same layout, which infra reads from `BACKEND_DIST`:
 
 ```bash
-for c in api migrate dbbootstrap dbbootstrap-provider presignup; do
+for dir in cmd/*; do
+  [ -d "$dir" ] || continue
+  c="${dir#cmd/}"
   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/$c/bootstrap" "./cmd/$c"
 done
 git rev-parse HEAD > dist/VERSION   # reported by /api/v1/healthz
@@ -68,6 +75,9 @@ Build from a clean checkout of `origin/main`.
 | `LOG_LEVEL` | No (`info`) | `debug`, `info`, `warn` or `error` |
 | `MAX_BODY_BYTES` | No (1 MiB) | Largest accepted request body |
 | `LOCAL_HTTP_ADDR` | No | Local development only: serve plain HTTP instead of the Lambda runtime; startup rejects it when Lambda runtime markers are present |
+| `DB_HOST`, `DB_NAME`, `DB_USER`, `AWS_REGION` | Yes | API database settings; Lambda requires `DB_AUTH=iam` and `DB_USER=app_rw` |
+| `DB_PORT` | No (`5432`) | PostgreSQL port |
+| `DB_AUTH` | No (`iam`) | Password mode and `DB_PASSWORD` are local-only for the API; see database configuration below |
 
 ## Trusted authorizer claims (S1-15)
 
@@ -82,6 +92,43 @@ It does not log token material or personal attributes. S1-06 mounts this guard w
 resolution; the current public health route and release smoke behavior stay as deployed until S1-14.
 
 Verify with `go test ./internal/apigw ./internal/config ./internal/http`.
+
+## API identity and current profile (S1-06/S1-07/S1-08)
+
+`GET /api/v1/me` is implemented against the existing OpenAPI contract. Its middleware requires
+Gateway claims with `token_use=id`, a subject and verified email. Missing/malformed identity
+returns a generic 401; uninvited, expired, revoked, conflicting or deactivated identity returns
+403. Bearer headers and token groups cannot supply identity or grant permissions. The health
+route stays public and cheap. Unknown-path smoke behavior stays unchanged until S1-14 adds the
+Gateway authorizer; with Cognito disabled, real HTTP `/me` requests fail closed with 401.
+
+First sign-in locks the normalized email, provisions from a pending invitation if needed, binds
+the unique subject and stamps invitation acceptance in one transaction. A seeded account keeps
+its UUID, names and database roles. Concurrent requests are idempotent; acceptance failure rolls
+back provisioning/binding. Returning requests require matching email and active status and read
+roles anew. Email-change workflows must clear the old binding and re-invite; this API never
+automatically transfers a subject to a changed email or overwrites roles from token claims.
+
+The lazy IAM pool is opened only after claim validation and reused with two connections per
+Lambda instance. Request identity I/O has a 12-second budget below the 15-second Lambda timeout.
+Error logs contain request IDs, stable problem types and outcomes, never raw database/AWS errors,
+emails, names or token material. `/me` maps only id, name, email, roles and organization; ordinary
+users receive an empty roles array. Responses are JSON with `Cache-Control: no-store`.
+
+All permission decisions go through `internal/authz`. `Self` requires the active actor and same
+organization; `Admin` grants administrative actions only. `Supervise` requires the current
+supervisor role plus an accepted same-org link, with no admin override. `PeerSchedule` requires
+an accepted same-org peer relationship and permits only the restricted schedule DTO. Relationship
+storage errors fail closed. Later handlers must resolve `httpapi.ActorFrom(ctx)`, call the matching
+policy before their service, and scope their SQL by actor/organization. A policy approval is never
+a substitute for a relationship-scoped query. Supervision storage itself arrives in later slices.
+
+Validation: `go test ./...` (Docker/PostgreSQL 17), `go vet ./...`, configured golangci-lint,
+`go generate ./...`, and the existing contract gates. Tests cover eight simultaneous first
+requests, two subjects competing for one email, one subject competing across emails, rollback,
+seeded admin binding, role revocation, deactivation, changed email, expired/revoked invitations,
+cross-org guards, SQL metacharacters, DTO schema and log privacy. Actual Gateway issuer/audience
+validation and live Google/native-token `/me` checks remain S1-14/activation acceptance.
 
 The pre-sign-up database role (`presignup_ro`, S1-17) has IAM login, CONNECT, schema USAGE and
 SELECT on exactly `users` and `invitations`. Bootstrap creates the role before migration; migration
