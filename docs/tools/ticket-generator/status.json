@@ -277,8 +277,8 @@
     },
     "S1-14": {
       "status": "in progress",
-      "merged": false,
-      "notes": "Prepared Gateway JWT authorizer with issuer and SPA/dev-only test audiences; exactly one public health route is asserted for enabled environments. No-token release checks and scoped native invited/uninvited /me plus authenticated unknown-path checks are prepared. Default auth remains disabled; live activation acceptance is pending.",
+      "merged": true,
+      "notes": "Infra #37 is merged; dev execution 0e7acddc-c06e-4743-bedb-7f39d8e11c64 is in progress. Gateway JWT routes, SPA/dev-test audiences and scoped token smoke checks are implemented. Auth stays disabled; actual authenticated acceptance remains pending activation.",
       "prs": [
         "infra/37"
       ]
@@ -286,7 +286,7 @@
     "S1-16": {
       "status": "in progress",
       "merged": false,
-      "notes": "Prepared exact Cognito origin in CloudFront and local CSP, strict header assertions, and no unsafe directives. Public runtime auth settings are validated, uploaded without caching and invalidated with index.html. Paired infra/frontend release and live activation remain pending.",
+      "notes": "Infra #37 is merged and its dev release is in progress; frontend #21 remains open. Exact Cognito CSP origin and validated no-store public runtime settings are implemented. Paired frontend release and live activation remain pending.",
       "prs": [
         "infra/37",
         "frontend/21"
@@ -311,7 +311,9 @@
     "S1-12": {
       "status": "in review",
       "merged": false,
-      "prs": [],
+      "prs": [
+        "backend/25"
+      ],
       "notes": "PostgreSQL regression tests reuse unchanged trusted claims after database admin/supervisor removal and deactivation, and reject token-group elevation for ordinary users. Role-authority runbook documents next-request enforcement, in-flight request timing and S5-05 Cognito follow-up. Review/merge remains pending; actual Gateway token acceptance is separately gated on activation."
     }
   }

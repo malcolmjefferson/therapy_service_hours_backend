@@ -315,9 +315,9 @@ VPC Lambda trigger connecting as presignup_ro with RDS IAM auth; rejects emails 
 
 **Completion / progress**
 
-Prepared Gateway JWT authorizer with issuer and SPA/dev-only test audiences; exactly one public health route is asserted for enabled environments. No-token release checks and scoped native invited/uninvited /me plus authenticated unknown-path checks are prepared. Default auth remains disabled; live activation acceptance is pending.
+Infra #37 is merged; dev execution 0e7acddc-c06e-4743-bedb-7f39d8e11c64 is in progress. Gateway JWT routes, SPA/dev-test audiences and scoped token smoke checks are implemented. Auth stays disabled; actual authenticated acceptance remains pending activation.
 
-Open PRs: [infra #37](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/37).
+Merged PRs: [infra #37](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/37).
 
 **Description**
 
@@ -334,7 +334,7 @@ S0 built one route, ANY /api/v1/{proxy+} (lib/app/api.ts), and API Gateway attac
 
 **Definition of Done**
 
-- [ ] Implementation merged
+- [x] Implementation merged
 - [ ] Validation: automated tests (and manual steps where noted) pass
 - [ ] Documentation: reviewer verification steps in the PR; OpenAPI/CLAUDE.md updated if a contract changed
 
@@ -683,7 +683,7 @@ Sign-in is Google only and SEC-07 forbids a backdoor, so if the single admin's G
 
 **Completion / progress**
 
-Prepared exact Cognito origin in CloudFront and local CSP, strict header assertions, and no unsafe directives. Public runtime auth settings are validated, uploaded without caching and invalidated with index.html. Paired infra/frontend release and live activation remain pending.
+Infra #37 is merged and its dev release is in progress; frontend #21 remains open. Exact Cognito CSP origin and validated no-store public runtime settings are implemented. Paired frontend release and live activation remain pending.
 
 Open PRs: [infra #37](https://github.com/malcolmjefferson/therapy_service_hours_infra/pull/37), [frontend #21](https://github.com/malcolmjefferson/therapy_service_hours_frontend/pull/21).
 
@@ -809,6 +809,8 @@ Header with title/kicker per prototype, user name menu, nav items by role, signe
 **Completion / progress**
 
 PostgreSQL regression tests reuse unchanged trusted claims after database admin/supervisor removal and deactivation, and reject token-group elevation for ordinary users. Role-authority runbook documents next-request enforcement, in-flight request timing and S5-05 Cognito follow-up. Review/merge remains pending; actual Gateway token acceptance is separately gated on activation.
+
+Open PRs: [backend #25](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/25).
 
 **Description**
 
