@@ -8,6 +8,7 @@
 - **Slice S0 (walking skeleton):** 9 done, 0 in review, 0 in progress, 0 not started (of 9 tickets touching this repo).
 - **AWS:** dev deployed end to end by the pipeline on 2026-10-11 (data, migrate, api, web, smoke tests). Prod deploys are deferred to milestone M3 (owner decision 2026-10-11).
 - **S1:** execution started; ADR-0008â€“0011 accepted by the owner on 2026-10-11.
+- **S2 (log hours):** S2-01 in review (schema migration `00003_log_hours.sql`); the other backend S2 tickets are not started.
 
 ## Tickets
 
@@ -42,3 +43,9 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 | S1-08 | Current user profile endpoint | done | [#24](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/24) | The deployed /me endpoint resolves the real Google owner and displays Default Organization and the database admin role. Repeat sign-in and reload resolve the profile again. Native tests verify invited 200 and uninvited 403, explicit DTO and no-store handling. |
 | S1-18 | Federation and trigger latency evidence | in progress | [#29](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/29) | Backend #29 is merged and released successfully in 7969a830-cd94-41da-bf97-6693b389e17d. Read-only owner verification before and after another real Google sign-in returns one Google identity and unchanged counts of one user, subject match, active admin and accepted invitation. Real uninvited Google sign-in is refused with SIGN_UP_NOT_ALLOWED (handler duration 69 ms, version 5) and creates no Cognito identity. Prior 99 warm version-3 samples have REPORT p99/max 54.37 ms. These observations do not establish representative cold-start p99, which remains outstanding. ADR-0008 records binding proof; production and the sole-admin decision are unchanged. |
 | S1-12 | Role authority and token staleness | done | [#25](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/25) | Backend #25 is merged at 8e1e29210edbe033646560d5f3523cb2ad669513 and released successfully in 79a1a47a-bc74-4a3a-be9b-923511bfc5f5. PostgreSQL regressions prove unchanged trusted claims cannot retain removed database roles or bypass deactivation; the runbook documents next-request enforcement and S5-05 Cognito follow-up. Real native/Google profile acceptance is verified separately. No live owner demotion or deactivation was performed. |
+
+## S2 execution (2026-10-13)
+
+| ID | Title | Status | PRs | Notes |
+|---|---|---|---|---|
+| S2-01 | Migration: categories, clients, entries, entry_clients with DB constraints | in review | PR pending | Migration `00003_log_hours.sql` creates the four tables with the times columns from day one, the 12 seeded categories (CLAUDE.md §8) and every entry rule as a named DB constraint, including the per-user overlap exclusion. `btree_gist` is created by the baseline migration, which the pipeline already ran on dev RDS as `migrator`; prod is deferred to M3. Constraint tests cover each rule against PostgreSQL. This migration reaches dev with the next pipeline run after merge. |

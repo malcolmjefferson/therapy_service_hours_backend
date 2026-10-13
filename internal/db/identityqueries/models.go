@@ -8,6 +8,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Category struct {
+	ID            pgtype.UUID
+	Name          string
+	CategoryGroup string
+	SortOrder     int16
+}
+
+type Client struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+	Name   string
+}
+
+type Entry struct {
+	ID              pgtype.UUID
+	UserID          pgtype.UUID
+	SessionDate     pgtype.Date
+	StartTime       pgtype.Time
+	EndTime         pgtype.Time
+	DurationMinutes int32
+	CategoryID      pgtype.UUID
+	OnSite          bool
+	Notes           pgtype.Text
+	Status          string
+	NeedsTime       bool
+	ReviewedBy      pgtype.UUID
+	ReviewedAt      pgtype.Timestamptz
+	ReviewNote      pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type EntryClient struct {
+	EntryID  pgtype.UUID
+	ClientID pgtype.UUID
+	UserID   pgtype.UUID
+}
+
 type Invitation struct {
 	ID             pgtype.UUID
 	Email          string
