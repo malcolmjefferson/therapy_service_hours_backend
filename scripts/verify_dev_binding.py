@@ -25,7 +25,7 @@ def aws_call(service, operation, payload):
             args += ["--function-name", "therapy-service-hours-dev-seed", "--payload", "fileb://" + str(request), str(root / "response.json")]
         else:
             args += ["--cli-input-json", "file://" + str(request)]
-        result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", timeout=60, check=False)
+        result = subprocess.run(args, env=dict(os.environ, AWS_CLI_OUTPUT_ENCODING="utf-8"), capture_output=True, text=True, encoding="utf-8", timeout=60, check=False)
         if result.returncode:
             raise VerificationFailure("VERIFICATION_AWS_CALL_FAILED")
         response = json.loads(result.stdout or "{}")

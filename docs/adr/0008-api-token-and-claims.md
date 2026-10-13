@@ -120,6 +120,23 @@ real-owner sign-in and logout; it does not independently count the persisted
 owner binding or demonstrate real uninvited/deactivated Google accounts.
 Those evidence items and representative cold p99 remain open in S1-18.
 
+### Binding proof preparation and release automation (2026-10-12)
+
+Backend #25 and frontend #22 merged. Combined dev execution
+`d41c4fb4-4e96-42d8-98bc-67da2a878869` succeeded, with both native browser cases
+explicitly passing in pipeline smoke and no accounts/invitations/renewals/native
+users created by the repeated seed step.
+
+Backend #29 prepares an IAM-only, dev-only read operation for the existing seed
+Lambda. A read-only SQL snapshot returns matching user/subject/admin/accepted
+invitation counts. The operator helper obtains the Google subject from the
+validated dev pool without exposing it; verification never applies a seed plan
+or repairs an account. The event omits the legacy admin email so older binaries
+refuse before storage. See the [verification runbook](../runbooks/dev-binding-verification.md).
+Actual persisted owner binding remains unverified until this operation releases
+and is run before and after another real sign-in. Cold p99 and real Google
+uninvited/deactivated demo remain separate open evidence items.
+
 ## Remaining open items
 
 - Revisit if a machine client ever needs the API (it would use the access token and its own routes).

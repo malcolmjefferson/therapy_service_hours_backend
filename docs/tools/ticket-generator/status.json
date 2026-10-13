@@ -2,7 +2,7 @@
   "updated": "2026-10-12",
   "slices": {
     "S0": "All 21 implementation tickets are merged. Dev delivery is verified by successful pipeline executions, including release `7c97ec40-371c-4387-8c26-817c75450d4c` (data, migration, app, web, frontend sync and smoke). The owner deferred production deployment to M3; production execution, the recorded/manual failure-injection demo and SNS email receipt are not claimed by this update.",
-    "S1": "Backend #28 is merged and deployed in successful release 11d38ada-a392-471f-bf45-81592cedf9a5. The owner successfully tested real Google sign-in; browser verification confirms the admin profile, hosted logout, repeat sign-in and reload reauthentication. Repeat enabled seed creates/renews nothing. Native Gateway/browser cases pass. Backend #25 role-authority review and frontend #22 release browser automation remain open. Representative cold p99, exact real-owner binding evidence and real Google uninvited/deactivated demo remain outstanding. The owner retains the sole dev admin; prod auth/deploy remain disabled."
+    "S1": "Backend #25 role-authority tests and frontend #22 native-browser automation are merged. Combined release d41c4fb4-4e96-42d8-98bc-67da2a878869 succeeded with both native browser cases passing in pipeline smoke and zero-change repeat seed. Real owner Google sign-in/repeat/logout/reload, one verified Cognito identity and zero-change repeat seed are verified. Backend #29 prepares read-only persisted binding proof. Cold p99 and real Google uninvited/deactivated acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled."
   },
   "tickets": {
     "S0-01": {
@@ -315,12 +315,12 @@
       ]
     },
     "S1-12": {
-      "status": "in review",
-      "merged": false,
+      "status": "done",
+      "merged": true,
       "prs": [
         "backend/25"
       ],
-      "notes": "Backend #25 provides PostgreSQL tests that reuse identical trusted claims after role removal and deactivation and reject token-group elevation. The branch is refreshed with merged backend #28. Real Gateway/native profile acceptance and actual Google admin sign-in are verified. Tests cover database role changes locally; no live owner demotion/deactivation was performed. Review/merge remains pending."
+      "notes": "Backend #25 is merged at 8e1e29210edbe033646560d5f3523cb2ad669513 and released successfully in 79a1a47a-bc74-4a3a-be9b-923511bfc5f5. PostgreSQL regressions prove unchanged trusted claims cannot retain removed database roles or bypass deactivation; the runbook documents next-request enforcement and S5-05 Cognito follow-up. Real native/Google profile acceptance is verified separately. No live owner demotion or deactivation was performed."
     },
     "S1-20": {
       "status": "done",
@@ -333,19 +333,19 @@
     },
     "S1-13": {
       "status": "in progress",
-      "merged": false,
+      "merged": true,
       "prs": [
         "frontend/22"
       ],
-      "notes": "Frontend #22 prepares release native-browser automation. Both native cases passed against deployed dev: real Gateway invited 200 and uninvited 403 relayed unchanged to the UI, revocation, safe storage and no token-group elevation. Actual owner Google first sign-in was reported successful; repeat sign-in, hosted logout and reload were observed and recorded locally after backend #28. Release automation awaits merge; real uninvited/deactivated Google demo remains outstanding."
+      "notes": "Frontend #22 is merged at 0fcba6b55e54785681ba91af2593988ec57706a5. Both native browser cases passed locally against deployed dev after the Google fix, with real Gateway 200/403 and native token cleanup. Combined release d41c4fb4-4e96-42d8-98bc-67da2a878869 succeeded; both native cases explicitly passed in pipeline smoke without skips, and repeat seed counters remained zero. Real owner Google first/repeat sign-in, logout and reload are demonstrated; real Google uninvited/deactivated acceptance remains outstanding."
     },
     "S1-18": {
       "status": "in progress",
-      "merged": true,
+      "merged": false,
       "prs": [
-        "backend/28"
+        "backend/29"
       ],
-      "notes": "Backend #28 is merged and released on live version 4. Owner reports successful first Google sign-in; browser verification observes admin profile, logout, repeat sign-in and reload. Read-only Cognito verification finds exactly one enabled federated Google identity with verified email after repeat sign-ins. The previous 99 warm version-3 samples have REPORT p99/max 54.37 ms, not cold p99. Exact real-owner database binding evidence, real Google uninvited/deactivated acceptance and representative cold measurements remain outstanding."
+      "notes": "Real owner Google sign-in/repeat/logout/reload and one enabled verified Cognito identity are verified. Backend #29 prepares dev-only read-only database binding verification through the existing IAM seed Lambda, with count-only output and an account/pool/identity-guarded operator helper. PostgreSQL snapshots prove no mutation across pending, bound/repeated, mismatch, demotion and deactivation; prod/input/legacy/privacy/cleanup tests pass. Actual persisted owner binding must be verified after its release. Representative cold p99 and real Google uninvited/deactivated acceptance remain open; prior 99 warm samples have p99/max 54.37 ms."
     }
   }
 }
