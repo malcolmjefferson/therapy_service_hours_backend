@@ -52,6 +52,10 @@ TESTCONTAINERS_RYUK_DISABLED=true go test -count=1 -v ./internal/migrate -run 'T
 These tests use PostgreSQL 17, the real identity store and authentication service,
 and the central authorization policies. They reuse identical trusted claims after
 demotion and deactivation, and try multiple group encodings on an ordinary user.
-They model claims already validated by Gateway; live token acceptance remains
-part of S1-14/S1-18 after auth activation. Check that both tests ran and passed:
-integration tests skip when Docker is unavailable.
+They model claims already validated by Gateway. Enabled dev release
+`11d38ada-a392-471f-bf45-81592cedf9a5` passed native Gateway admission, and the
+real Google owner profile shows the database admin role. Native browser tests
+also reject fictional protocol-token group elevation. The database mutation
+regressions run against isolated PostgreSQL; no live owner demotion or
+deactivation is performed by this verification. Check that both tests ran and
+passed: integration tests skip when Docker is unavailable.

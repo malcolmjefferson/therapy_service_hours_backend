@@ -85,6 +85,41 @@ release gates keep working; one place decides roles.
 - S1-14: `scripts/smoke.sh` passes unchanged; a synth test counts unauthenticated routes.
 - S1-15: adapter tests for a claims-present and a claims-absent event.
 
-## Open items
+## Dev proof checkpoint (2026-10-12, S1-18)
+
+Activation execution `248fa024-49a0-4ebc-bc76-73a236ca9aaa` succeeded. Real native
+ID tokens pass Gateway and database-backed profile acceptance for the invited fixture
+and refuse the uninvited fixture; both corresponding deployed-browser cases pass.
+These tests do not prove Google federation or hosted-cookie logout.
+
+The owner's real Google consent/callback attempt was refused by the pre-sign-up
+guard before database admission. In this case-insensitive pool, Cognito lowercases
+the entire federated username, including the provider label ([AWS mapping documentation](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-specifying-attribute-mapping.html)).
+Two otherwise-identical synthetic events against a still-pending supervisor invitation
+reproduced uppercase `Google_` allow and lowercase `google_` refusal on version 3.
+Backend #28 compares only the provider label without case sensitivity and preserves
+the username, verified-email requirement and invitation authority. Actual first/repeat
+Google identity creation/binding and logout must be rechecked after that release.
+
+### Post-fix acceptance (2026-10-12)
+
+Backend #28 merged and deployed in successful execution
+`11d38ada-a392-471f-bf45-81592cedf9a5`; the live trigger is version 4.
+The owner reported successful real Google sign-in. Browser verification then
+observed the database-backed admin profile, sign-out returning through hosted
+logout to the signed-out landing, repeat Google sign-in and page-reload
+reauthentication. No owner credentials or callback material were retained.
+Screenshots remain local and are not included in the public repository.
+
+The repeat enabled seed step reported zero accounts, invitations, renewals and
+native Cognito users created. A read-only Cognito check after repeat sign-ins
+finds exactly one matching, enabled federated Google identity with verified
+email; only counts and booleans were retained. Native invited/uninvited Gateway acceptance and
+deployed browser rendering were verified separately. This establishes functional
+real-owner sign-in and logout; it does not independently count the persisted
+owner binding or demonstrate real uninvited/deactivated Google accounts.
+Those evidence items and representative cold p99 remain open in S1-18.
+
+## Remaining open items
 
 - Revisit if a machine client ever needs the API (it would use the access token and its own routes).
