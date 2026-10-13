@@ -23,6 +23,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
 	httpapi "github.com/malcolmjefferson/therapy_service_hours_backend/internal/http"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/migrate"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/testpg"
 )
@@ -66,6 +67,10 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	clientService, err := clients.New(db.NewClientStore(pool))
+	if err != nil {
+		t.Fatal(err)
+	}
 	e.router, err = httpapi.NewRouter(httpapi.RouterDeps{
 		Logger:        quietLogger(),
 		Version:       "test",
@@ -74,6 +79,7 @@ func newEnv(t *testing.T) *env {
 		Now:           time.Now,
 		ActorResolver: actorFunc(func(context.Context, map[string]string) (domain.Actor, error) { return e.actor, nil }),
 		Entries:       service,
+		Clients:       clientService,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
@@ -21,6 +22,7 @@ import (
 type server struct {
 	version string
 	entries EntryLister
+	clients ClientService
 }
 
 var _ gen.StrictServerInterface = (*server)(nil)
@@ -31,7 +33,7 @@ func (s *server) GetHealth(_ context.Context, _ gen.GetHealthRequestObject) (gen
 }
 
 // mountAPI registers the generated routes under BasePath on r.
-func mountAPI(r chi.Router, s *server, resolver ActorResolver) {
+func mountAPI(r chi.Router, s *server, resolver ActorResolver, spec *openapi3.T) {
 	strict := gen.NewStrictHandlerWithOptions(s, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  badRequest,
 		ResponseErrorHandlerFunc: WriteError,
@@ -41,7 +43,7 @@ func mountAPI(r chi.Router, s *server, resolver ActorResolver) {
 		BaseRouter:       r,
 		ErrorHandlerFunc: badRequest,
 		Middlewares: []gen.MiddlewareFunc{func(next http.Handler) http.Handler {
-			protected := RequireAuthorizerClaims(resolveActor(resolver)(next))
+			protected := RequireAuthorizerClaims(resolveActor(resolver)(validateBodies(spec)(next)))
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if req.Method == http.MethodGet && req.URL.Path == BasePath+"/healthz" {
 					next.ServeHTTP(w, req)

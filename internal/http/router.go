@@ -2,10 +2,13 @@ package httpapi
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/http/gen"
 )
 
 // BasePath is the prefix of every API route (CLAUDE.md §10).
@@ -27,6 +30,8 @@ type RouterDeps struct {
 	ActorResolver ActorResolver
 	// Entries serves the log-hours endpoints.
 	Entries EntryLister
+	// Clients is the saved-clients use case (S2-07).
+	Clients ClientService
 }
 
 func (d RouterDeps) validate() error {
@@ -52,6 +57,9 @@ func (d RouterDeps) validate() error {
 	if d.Entries == nil {
 		errs = append(errs, errors.New("entries service is required"))
 	}
+	if d.Clients == nil {
+		errs = append(errs, errors.New("clients service is required"))
+	}
 	return errors.Join(errs...)
 }
 
@@ -60,8 +68,12 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 	if err := deps.validate(); err != nil {
 		return nil, err
 	}
+	spec, err := gen.GetSpec()
+	if err != nil {
+		return nil, fmt.Errorf("load embedded OpenAPI spec: %w", err)
+	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version, entries: deps.Entries}, deps.ActorResolver)
+	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients}, deps.ActorResolver, spec)
 	return r, nil
 }
 

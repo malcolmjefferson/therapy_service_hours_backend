@@ -19,6 +19,8 @@ const (
 	ProblemUnauthorized     ProblemType = "urn:therapy-service-hours:problem:unauthorized"
 	ProblemConflict         ProblemType = "urn:therapy-service-hours:problem:conflict"
 	ProblemValidation       ProblemType = "urn:therapy-service-hours:problem:validation"
+	ProblemClientNameTaken  ProblemType = "urn:therapy-service-hours:problem:client-name-taken"
+	ProblemClientInUse      ProblemType = "urn:therapy-service-hours:problem:client-in-use"
 )
 
 // Problem is an RFC 7807 problem details body.
@@ -29,6 +31,34 @@ type Problem struct {
 	Detail    string         `json:"detail,omitempty"`
 	RequestID string         `json:"request_id,omitempty"`
 	Errors    []ProblemField `json:"errors,omitempty"`
+	// Extensions are the extra members a problem type documents in the OpenAPI spec, for example
+	// `existing_client`. They are written at the top level next to the standard members and can
+	// never replace one of them.
+	Extensions map[string]any `json:"-"`
+}
+
+// MarshalJSON writes the standard members and then the extension members (RFC 7807 section 3.2).
+func (p Problem) MarshalJSON() ([]byte, error) {
+	type plain Problem // No methods, so this does not recurse.
+	base, err := json.Marshal(plain(p))
+	if err != nil || len(p.Extensions) == 0 {
+		return base, err //nolint:wrapcheck // Marshal errors are already specific.
+	}
+	members := map[string]json.RawMessage{}
+	if err := json.Unmarshal(base, &members); err != nil {
+		return nil, err //nolint:wrapcheck // Round trip of our own output.
+	}
+	for name, value := range p.Extensions {
+		if _, reserved := members[name]; reserved {
+			continue
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return nil, err //nolint:wrapcheck // Marshal errors are already specific.
+		}
+		members[name] = raw
+	}
+	return json.Marshal(members) //nolint:wrapcheck // Marshal errors are already specific.
 }
 
 // ProblemField is one invalid input field in a validation problem.

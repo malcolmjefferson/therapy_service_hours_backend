@@ -10,13 +10,9 @@ output-options:
   skip-prune: true
   # S2-03 publishes the log-hours contract before S2-05 to S2-08 implement its routes. Generate the
   # models now; each of those tickets removes its operations from this list so the strict server
-  # method becomes required.
+  # method becomes required. S2-07 (clients) is implemented, so its operations are no longer excluded.
   exclude-operation-ids:
     - listCategories
-    - listClients
-    - createClient
-    - renameClient
-    - deleteClient
     - createEntry
     - getEntry
     - updateEntry

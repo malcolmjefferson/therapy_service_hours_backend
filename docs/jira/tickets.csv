@@ -614,11 +614,11 @@ Requirements: FR-LOG-07
 Stories: US-03
 
 Definition of Done: implementation, validation (automated tests), documentation (OpenAPI/CLAUDE.md as needed).",Medium,3,backend,api,S2,,,0.5d,1,S2-08,,,,,,,,
-62,Story,S2-09 Idempotency-Key middleware,"Store key, actor, request hash and response in an idempotency table (Postgres, no extra service) with TTL cleanup; replay returns the original response; mismatched hash returns 422.
+62,Story,S2-09 Idempotency-Key middleware,"Store key, actor, request hash and response in an idempotency table (Postgres, no extra service) with TTL cleanup; replay returns the original response; mismatched hash returns 409 (owner decision, GO-57).
 
 Acceptance criteria:
 * Same key twice creates one entry
-* Different payload with same key returns 422
+* Different payload with same key returns 409
 * Expired keys purged by a scheduled cleanup
 
 Requirements: FR-LOG-01, NFR-DOC-01

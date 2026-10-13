@@ -319,12 +319,12 @@ GET /categories returns grouped lookup data with Cache-Control.
 
 **Description**
 
-Store key, actor, request hash and response in an idempotency table (Postgres, no extra service) with TTL cleanup; replay returns the original response; mismatched hash returns 422.
+Store key, actor, request hash and response in an idempotency table (Postgres, no extra service) with TTL cleanup; replay returns the original response; mismatched hash returns 409 (owner decision, GO-57).
 
 **Acceptance criteria**
 
 - [ ] Same key twice creates one entry
-- [ ] Different payload with same key returns 422
+- [ ] Different payload with same key returns 409
 - [ ] Expired keys purged by a scheduled cleanup
 
 **Definition of Done**
