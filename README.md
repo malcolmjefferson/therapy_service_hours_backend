@@ -199,6 +199,22 @@ Generated queries live in `internal/db/identityqueries`. This approved MIT-licen
 replaces handwritten query code and is not imported into the Lambda binaries. Verify schema and
 queries with Docker running: `go test ./internal/migrate ./internal/db/...` and `go tool sqlc diff`.
 
+## Log-hours schema (S2-01)
+
+`db/migrations/00003_log_hours.sql` creates `categories` (seeded with the 12 categories of CLAUDE.md
+§8 in display order), `clients`, `entries` and `entry_clients`. Session times are part of the first
+version of the schema. Each entry rule is a named database constraint, so the service layer cannot
+bypass it: `entries_end_after_start_chk`, `entries_times_together_chk`, `entries_quarter_hour_chk`,
+`entries_duration_matches_times_chk`, `entries_duration_range_chk`, `entries_needs_time_chk` and the
+`btree_gist` exclusion `entries_no_overlap_excl` (one user's non-rejected entries with times never
+overlap; back-to-back sessions are allowed). Legacy entries without times keep their minutes, are
+flagged `needs_time` and are ignored by the overlap rule. `entry_clients` carries the owner so an
+entry can only reference its owner's clients. Constraint tests: `internal/migrate/log_hours_schema_test.go`.
+
+`btree_gist` is created by the baseline migration (`00001_baseline.sql`). It is a trusted extension
+on RDS PostgreSQL 13 and later, so the `migrator` role creates it without superuser rights; the
+baseline has already run on the dev database through the pipeline.
+
 ## Identity seed Lambda (S1-09)
 
 `cmd/seed` is invoked through IAM, with no public HTTP route. It connects as `app_rw` using

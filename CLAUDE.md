@@ -348,11 +348,11 @@ Primary keys are UUIDs. All timestamps are `timestamptz` except session times (l
 | `organizations` | `id`, `name` (unique), `created_at` |
 | `users` | `id`, `organization_id` (NOT NULL), `email` (citext, unique), `first_name`, `last_name`, `status` (`active`/`deactivated`), `cognito_sub` (nullable, unique), role mirror (`is_supervisor`, `is_admin`), `created_at`, `deactivated_at` |
 | `invitations` | `id`, `email` (citext), `organization_id`, `roles`, `invited_by`, `created_at`, `expires_at`, `status` (`pending`/`accepted`/`revoked`), `accepted_at`; partial unique index on `email` where `status = 'pending'` (ADR-0010) |
-| `categories` | `id`, `name`, `group` (`direct`/`indirect`/`supervision`), `sort_order` |
+| `categories` | `id`, `name`, `category_group` (`direct`/`indirect`/`supervision`; `group` is a reserved SQL word), `sort_order` |
 | `goals` | `id`, `user_id`, `goal_type`, `target_hours`, `last_celebrated_percent`; unique `(user_id, goal_type)` |
 | `clients` | `id`, `user_id`, `name`; unique `(user_id, lower(name))` |
 | `entries` | `id`, `user_id`, `session_date`, `start_time` (nullable, legacy), `end_time` (nullable, legacy), `duration_minutes`, `category_id`, `on_site`, `notes`, `status`, `needs_time`, `reviewed_by`, `reviewed_at`, `review_note`, `created_at`, `updated_at` |
-| `entry_clients` | `entry_id`, `client_id` |
+| `entry_clients` | `entry_id`, `client_id`, `user_id` (the owner of both; composite foreign keys keep an entry on its owner's clients) |
 | `supervision_links` | `id`, `supervisee_id`, `supervisor_id`, `organization_id`, `status` (`pending`/`accepted`/`declined`/`cancelled`/`ended`), `requested_at`, `responded_at`, `ended_at`, `ended_by` |
 | `entry_status_history` | `id`, `entry_id`, `from_status`, `to_status`, `changed_by` (nullable), `changed_by_name` (snapshot), `reason`, `changed_at` |
 | `notifications` | `id`, `user_id`, `type`, `payload` (jsonb), `read_at`, `created_at` |
