@@ -11,6 +11,52 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countClientEntries = `-- name: CountClientEntries :one
+SELECT count(*) FROM entry_clients
+WHERE client_id = $1 AND user_id = $2
+`
+
+type CountClientEntriesParams struct {
+	ClientID pgtype.UUID
+	UserID   pgtype.UUID
+}
+
+func (q *Queries) CountClientEntries(ctx context.Context, arg CountClientEntriesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countClientEntries, arg.ClientID, arg.UserID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countClients = `-- name: CountClients :one
+SELECT count(*) FROM clients WHERE user_id = $1
+`
+
+func (q *Queries) CountClients(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countClients, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteClient = `-- name: DeleteClient :execrows
+DELETE FROM clients WHERE id = $1 AND user_id = $2
+`
+
+type DeleteClientParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// entry_clients rows go with the client (ON DELETE CASCADE), which detaches it from its entries.
+func (q *Queries) DeleteClient(ctx context.Context, arg DeleteClientParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteClient, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getClientByName = `-- name: GetClientByName :one
 SELECT id, user_id, name FROM clients
 WHERE user_id = $1 AND lower(name) = lower($2::text)
@@ -105,4 +151,81 @@ func (q *Queries) ListClients(ctx context.Context, userID pgtype.UUID) ([]Client
 		return nil, err
 	}
 	return items, nil
+}
+
+const listClientsPage = `-- name: ListClientsPage :many
+
+SELECT id, user_id, name FROM clients
+WHERE user_id = $1
+ORDER BY lower(name), id
+LIMIT $3 OFFSET $2
+`
+
+type ListClientsPageParams struct {
+	UserID     pgtype.UUID
+	PageOffset int32
+	PageLimit  int32
+}
+
+// S2-07: clients API. Every statement is scoped to the owning user in the SQL itself (GO-47), so
+// another user's client id matches no row and the caller sees 404.
+func (q *Queries) ListClientsPage(ctx context.Context, arg ListClientsPageParams) ([]Client, error) {
+	rows, err := q.db.Query(ctx, listClientsPage, arg.UserID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Client{}
+	for rows.Next() {
+		var i Client
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockClient = `-- name: LockClient :one
+SELECT id, user_id, name FROM clients
+WHERE id = $1 AND user_id = $2
+FOR UPDATE
+`
+
+type LockClientParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// Locks the caller's client row. Attaching the client to an entry takes a KEY SHARE lock on it
+// (foreign key), so after this returns no entry can start using the client until the transaction ends.
+func (q *Queries) LockClient(ctx context.Context, arg LockClientParams) (Client, error) {
+	row := q.db.QueryRow(ctx, lockClient, arg.ID, arg.UserID)
+	var i Client
+	err := row.Scan(&i.ID, &i.UserID, &i.Name)
+	return i, err
+}
+
+const renameClient = `-- name: RenameClient :one
+UPDATE clients SET name = $1
+WHERE id = $2 AND user_id = $3
+RETURNING id, user_id, name
+`
+
+type RenameClientParams struct {
+	Name   string
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// A name another client of the same user already has, ignoring case, violates
+// clients_user_id_lower_name_idx (SQLSTATE 23505). Changing only the case of the client's own name is allowed.
+func (q *Queries) RenameClient(ctx context.Context, arg RenameClientParams) (Client, error) {
+	row := q.db.QueryRow(ctx, renameClient, arg.Name, arg.ID, arg.UserID)
+	var i Client
+	err := row.Scan(&i.ID, &i.UserID, &i.Name)
+	return i, err
 }

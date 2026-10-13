@@ -56,6 +56,7 @@ func testDeps(sink *logSink) RouterDeps {
 		ActorResolver: resolverFunc(func(context.Context, map[string]string) (domain.Actor, error) {
 			return domain.Actor{}, domain.ErrForbidden
 		}),
+		Clients: &fakeClients{},
 	}
 }
 

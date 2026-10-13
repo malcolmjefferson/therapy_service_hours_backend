@@ -17,6 +17,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/db"
 	httpapi "github.com/malcolmjefferson/therapy_service_hours_backend/internal/http"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/authn"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 )
 
 func main() {
@@ -47,6 +48,11 @@ func run() error {
 		return err
 	}
 
+	clientService, err := clients.New(db.NewClientStore(store))
+	if err != nil {
+		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
+	}
+
 	router, err := httpapi.NewRouter(httpapi.RouterDeps{
 		Logger:        logger,
 		Version:       cfg.Version,
@@ -54,6 +60,7 @@ func run() error {
 		NewRequestID:  httpapi.RandomID,
 		Now:           time.Now,
 		ActorResolver: identity,
+		Clients:       clientService,
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
