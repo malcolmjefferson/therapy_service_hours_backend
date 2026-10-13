@@ -2,10 +2,13 @@ package httpapi
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/http/gen"
 )
 
 // BasePath is the prefix of every API route (CLAUDE.md §10).
@@ -25,6 +28,8 @@ type RouterDeps struct {
 	Now Clock
 	// ActorResolver authenticates protected routes; health never calls it.
 	ActorResolver ActorResolver
+	// Clients is the saved-clients use case (S2-07).
+	Clients ClientService
 }
 
 func (d RouterDeps) validate() error {
@@ -47,6 +52,9 @@ func (d RouterDeps) validate() error {
 	if d.ActorResolver == nil {
 		errs = append(errs, errors.New("actor resolver is required"))
 	}
+	if d.Clients == nil {
+		errs = append(errs, errors.New("clients service is required"))
+	}
 	return errors.Join(errs...)
 }
 
@@ -55,8 +63,12 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 	if err := deps.validate(); err != nil {
 		return nil, err
 	}
+	spec, err := gen.GetSpec()
+	if err != nil {
+		return nil, fmt.Errorf("load embedded OpenAPI spec: %w", err)
+	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version}, deps.ActorResolver)
+	mountAPI(r, &server{version: deps.Version, clients: deps.Clients}, deps.ActorResolver, spec)
 	return r, nil
 }
 

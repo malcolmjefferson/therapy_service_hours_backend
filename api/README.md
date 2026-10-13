@@ -5,11 +5,17 @@
 ## Workflow for a contract change
 
 S2-03 defines the log-hours contract (categories, clients, entries) before S2-05 to S2-08
-implement it. The generator excludes those operations from route generation
+implement it. The generator excludes the operations that are not implemented yet from route generation
 (`exclude-operation-ids` in `api/oapi-codegen.yaml`) while retaining their models, and the embedded
 server spec is filtered too; the full published contract remains `api/openapi.yaml`. When a ticket
 implements an operation, it removes that operation from the list, implements the strict handler and
-regenerates. There are no placeholder handlers behind this contract-only change.
+regenerates. There are no placeholder handlers behind this contract-only change. The clients
+operations (S2-07) are implemented and no longer excluded; categories and entries still are.
+
+Request bodies are checked against the request schema before a handler runs
+(`internal/http/bodyschema.go`), so `additionalProperties: false`, `required`, types and lengths in
+the spec are enforced at runtime. A violation is a `400` validation problem that names the field but
+never echoes the value.
 
 Merge each frontend pinned-spec/types/handler update with its contract in one release; the
 pipeline's drift gate checks the backend commit and pinned frontend copy byte for byte.
