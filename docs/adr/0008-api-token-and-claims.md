@@ -155,6 +155,10 @@ outside the public repositories. This establishes the invited/repeated binding
 and uninvited refusal paths. It does not establish cold-start p99 or the separate
 returning-deactivated-account slice demo.
 
+Update (2026-10-13): the owner reports that the returning-deactivated-account demo
+passed on dev with a second real Google account. No account identifier or
+screenshot is committed. Cold-start p99 is still open.
+
 ## Remaining open items
 
 - Revisit if a machine client ever needs the API (it would use the access token and its own routes).

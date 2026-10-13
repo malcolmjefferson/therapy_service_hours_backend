@@ -19,7 +19,7 @@ An invited Google account signs in and sees its name and role-based navigation; 
 
 **17 done** · **3 in progress** · **0 in review** · **0 not started**
 
-Enabled dev release 7969a830-cd94-41da-bf97-6693b389e17d succeeded with backend #29 and merged frontend #22. Both native browser cases pass in pipeline smoke; repeated seed creates/renews nothing. Real Google owner sign-in/repeat/logout/reload and unchanged persisted binding counts are verified. A separate real uninvited Google account is refused and remains absent from Cognito. S1-13 is complete. Representative cold p99, the deactivated-account slice demo and future role-specific navigation acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled.
+Enabled dev release 7969a830-cd94-41da-bf97-6693b389e17d succeeded with backend #29 and merged frontend #22. Both native browser cases pass in pipeline smoke; repeated seed creates/renews nothing. Real Google owner sign-in/repeat/logout/reload and unchanged persisted binding counts are verified. A separate real uninvited Google account is refused and remains absent from Cognito. S1-13 is complete. The owner reports the deactivated-account slice demo passed on dev with a second real Google account (2026-10-13). Representative cold p99 and future role-specific navigation acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled.
 
 **Status legend:** done = merged implementation; in progress = partial implementation or remaining acceptance; in review = open PR; not started = implementation has not begun. Completion notes distinguish dev verification from deferred prod/manual acceptance. Acceptance checkboxes are not automatically checked from merge status.
 
@@ -277,7 +277,7 @@ Second half of the spike, once the pool exists. Prove on dev what ADR-0007 and A
 
 **Completion / progress**
 
-The merged trigger admits the real invited Google owner and refuses a separate real uninvited Google account with SIGN_UP_NOT_ALLOWED on version 5; Cognito identity count remains zero after refusal. PostgreSQL and privacy tests cover expired/accepted invitations and deactivated users. The read-only role and warmed alias are deployed. Representative cold-start p99 remains unverified; the separate returning-deactivated-account slice demo is outstanding.
+The merged trigger admits the real invited Google owner and refuses a separate real uninvited Google account with SIGN_UP_NOT_ALLOWED on version 5; Cognito identity count remains zero after refusal. PostgreSQL and privacy tests cover expired/accepted invitations and deactivated users. The read-only role and warmed alias are deployed. Representative cold-start p99 remains unverified. The owner reports the returning-deactivated-account slice demo passed on dev with a second real Google account (reported 2026-10-13); no account identifier or screenshot is committed.
 
 Merged PRs: [backend #28](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/28).
 
@@ -861,7 +861,7 @@ Verify that the users row decides admin and supervisor, and that cognito:groups 
 
 **Completion / progress**
 
-Frontend #22 is merged and released. Both native invited/denied browser cases explicitly passed in pipeline smoke in d41c4fb4-4e96-42d8-98bc-67da2a878869 and 7969a830-cd94-41da-bf97-6693b389e17d. The separate real Google demo records owner sign-in/repeat/logout/reload and uninvited denial; the uninvited account has zero Cognito identities before and after. No real credentials or identities were committed; automated tests do not drive Google. The deactivated-account slice demo remains separate.
+Frontend #22 is merged and released. Both native invited/denied browser cases explicitly passed in pipeline smoke in d41c4fb4-4e96-42d8-98bc-67da2a878869 and 7969a830-cd94-41da-bf97-6693b389e17d. The separate real Google demo records owner sign-in/repeat/logout/reload and uninvited denial; the uninvited account has zero Cognito identities before and after. No real credentials or identities were committed; automated tests do not drive Google. The owner reports the deactivated-account slice demo passed separately on dev with a second real Google account (2026-10-13).
 
 Merged PRs: [frontend #22](https://github.com/malcolmjefferson/therapy_service_hours_frontend/pull/22).
 

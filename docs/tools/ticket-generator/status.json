@@ -2,7 +2,7 @@
   "updated": "2026-10-12",
   "slices": {
     "S0": "All 21 implementation tickets are merged. Dev delivery is verified by successful pipeline executions, including release `7c97ec40-371c-4387-8c26-817c75450d4c` (data, migration, app, web, frontend sync and smoke). The owner deferred production deployment to M3; production execution, the recorded/manual failure-injection demo and SNS email receipt are not claimed by this update.",
-    "S1": "Enabled dev release 7969a830-cd94-41da-bf97-6693b389e17d succeeded with backend #29 and merged frontend #22. Both native browser cases pass in pipeline smoke; repeated seed creates/renews nothing. Real Google owner sign-in/repeat/logout/reload and unchanged persisted binding counts are verified. A separate real uninvited Google account is refused and remains absent from Cognito. S1-13 is complete. Representative cold p99, the deactivated-account slice demo and future role-specific navigation acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled."
+    "S1": "Enabled dev release 7969a830-cd94-41da-bf97-6693b389e17d succeeded with backend #29 and merged frontend #22. Both native browser cases pass in pipeline smoke; repeated seed creates/renews nothing. Real Google owner sign-in/repeat/logout/reload and unchanged persisted binding counts are verified. A separate real uninvited Google account is refused and remains absent from Cognito. S1-13 is complete. The owner reports the deactivated-account slice demo passed on dev with a second real Google account (2026-10-13). Representative cold p99 and future role-specific navigation acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled."
   },
   "tickets": {
     "S0-01": {
@@ -201,7 +201,7 @@
     },
     "S1-03": {
       "status": "in progress",
-      "notes": "The merged trigger admits the real invited Google owner and refuses a separate real uninvited Google account with SIGN_UP_NOT_ALLOWED on version 5; Cognito identity count remains zero after refusal. PostgreSQL and privacy tests cover expired/accepted invitations and deactivated users. The read-only role and warmed alias are deployed. Representative cold-start p99 remains unverified; the separate returning-deactivated-account slice demo is outstanding.",
+      "notes": "The merged trigger admits the real invited Google owner and refuses a separate real uninvited Google account with SIGN_UP_NOT_ALLOWED on version 5; Cognito identity count remains zero after refusal. PostgreSQL and privacy tests cover expired/accepted invitations and deactivated users. The read-only role and warmed alias are deployed. Representative cold-start p99 remains unverified. The owner reports the returning-deactivated-account slice demo passed on dev with a second real Google account (reported 2026-10-13); no account identifier or screenshot is committed.",
       "prs": [
         "backend/28"
       ],
@@ -337,7 +337,7 @@
       "prs": [
         "frontend/22"
       ],
-      "notes": "Frontend #22 is merged and released. Both native invited/denied browser cases explicitly passed in pipeline smoke in d41c4fb4-4e96-42d8-98bc-67da2a878869 and 7969a830-cd94-41da-bf97-6693b389e17d. The separate real Google demo records owner sign-in/repeat/logout/reload and uninvited denial; the uninvited account has zero Cognito identities before and after. No real credentials or identities were committed; automated tests do not drive Google. The deactivated-account slice demo remains separate."
+      "notes": "Frontend #22 is merged and released. Both native invited/denied browser cases explicitly passed in pipeline smoke in d41c4fb4-4e96-42d8-98bc-67da2a878869 and 7969a830-cd94-41da-bf97-6693b389e17d. The separate real Google demo records owner sign-in/repeat/logout/reload and uninvited denial; the uninvited account has zero Cognito identities before and after. No real credentials or identities were committed; automated tests do not drive Google. The owner reports the deactivated-account slice demo passed separately on dev with a second real Google account (2026-10-13)."
     },
     "S1-18": {
       "status": "in progress",
