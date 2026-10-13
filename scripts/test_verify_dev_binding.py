@@ -49,6 +49,7 @@ class BindingVerificationTests(unittest.TestCase):
         seen = []
         def run(args, **kwargs):
             self.assertTrue(kwargs["capture_output"])
+            self.assertEqual(kwargs["env"]["AWS_CLI_OUTPUT_ENCODING"], "utf-8")
             self.assertNotIn("private-subject", " ".join(args))
             request = Path(next(value[8:] for value in args if value.startswith("fileb://")))
             seen.append(request.parent)
