@@ -4,14 +4,15 @@
 
 ## Workflow for a contract change
 
-S1-05 defines `/me` before its S1-08 implementation. The generator currently excludes `getMe`
-from route generation while retaining its models. The embedded server spec is filtered too; the
-full published contract remains `api/openapi.yaml`. Remove the
-`exclude-operation-ids` filter in S1-08, implement the strict handler, and regenerate. There is no
-placeholder `/me` handler exposed by this contract-only change.
+S2-03 defines the log-hours contract (categories, clients, entries) before S2-05 to S2-08
+implement it. The generator excludes those operations from route generation
+(`exclude-operation-ids` in `api/oapi-codegen.yaml`) while retaining their models, and the embedded
+server spec is filtered too; the full published contract remains `api/openapi.yaml`. When a ticket
+implements an operation, it removes that operation from the list, implements the strict handler and
+regenerates. There are no placeholder handlers behind this contract-only change.
 
-Merge the S1-19 frontend pinned-spec/types/handler update with this contract in one release;
-the pipeline's drift gate checks the backend commit and pinned frontend copy byte for byte.
+Merge each frontend pinned-spec/types/handler update with its contract in one release; the
+pipeline's drift gate checks the backend commit and pinned frontend copy byte for byte.
 
 1. Edit `api/openapi.yaml`.
 2. Regenerate the Go server: `go generate ./...` (writes `internal/http/gen/api.gen.go`, which is committed).
@@ -35,6 +36,7 @@ the pipeline's drift gate checks the backend commit and pinned frontend copy byt
 | **Limits** | Every free-text string has `maxLength` and every array has `maxItems` (SEC-26). |
 | **Auth** | `cognitoJwt` is required globally. Only public operations declare `security: []` (today only `GET /healthz`). |
 | **Audiences** | Responses are explicit, per-audience schemas. Peer and supervisor schemas never reference the owner's entry schema (ARC-18, SEC-40). |
+| **Log-hours problems** | `409` `urn:therapy-service-hours:problem:entry-overlap` (with `conflicting_entry`), `entry-locked` (approved entry), `client-name-taken` (with `existing_client`) and `client-in-use` (with `entry_count`). Unknown request fields, including `hours`, are `400` `validation`. Another user's entry or client is `404`, never `403`. |
 | **Compatibility** | Within v1, only add optional fields, new endpoints, or enum values the frontend handles. Anything `oasdiff` reports as breaking needs the `breaking-change` PR label, and both sides must ship in the same release (ARC-14). |
 
 ## Spectral ruleset (`.spectral.yaml`)

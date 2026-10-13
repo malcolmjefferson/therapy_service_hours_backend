@@ -14,11 +14,54 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for CategoryGroup.
+const (
+	Direct      CategoryGroup = "direct"
+	Indirect    CategoryGroup = "indirect"
+	Supervision CategoryGroup = "supervision"
+)
+
+// Valid indicates whether the value is a known member of the CategoryGroup enum.
+func (e CategoryGroup) Valid() bool {
+	switch e {
+	case Direct:
+		return true
+	case Indirect:
+		return true
+	case Supervision:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EntryStatus.
+const (
+	Approved EntryStatus = "approved"
+	Pending  EntryStatus = "pending"
+	Rejected EntryStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the EntryStatus enum.
+func (e EntryStatus) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Pending:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for HealthResponseStatus.
 const (
@@ -52,6 +95,197 @@ func (e MeResponseRoles) Valid() bool {
 		return false
 	}
 }
+
+// Category defines model for Category.
+type Category struct {
+	Id   openapi_types.UUID `json:"id"`
+	Name string             `json:"name"`
+}
+
+// CategoryGroup The group a category belongs to. It decides which goals the hours count toward.
+type CategoryGroup string
+
+// CategoryGroupSection defines model for CategoryGroupSection.
+type CategoryGroupSection struct {
+	Categories []Category `json:"categories"`
+
+	// Group The group a category belongs to. It decides which goals the hours count toward.
+	Group CategoryGroup `json:"group"`
+
+	// Label Display name, for example `Direct Service`.
+	Label string `json:"label"`
+}
+
+// CategoryListResponse defines model for CategoryListResponse.
+type CategoryListResponse struct {
+	// Groups Groups in display order, each with its categories in display order.
+	Groups []CategoryGroupSection `json:"groups"`
+}
+
+// CategoryRef The category of an entry, with its group, so the table needs no second lookup.
+type CategoryRef struct {
+	// Group The group a category belongs to. It decides which goals the hours count toward.
+	Group CategoryGroup      `json:"group"`
+	Id    openapi_types.UUID `json:"id"`
+	Name  string             `json:"name"`
+}
+
+// Client defines model for Client.
+type Client struct {
+	Id openapi_types.UUID `json:"id"`
+
+	// Name Pseudonym or initials only (CLAUDE.md section 0.7).
+	Name string `json:"name"`
+}
+
+// ClientConflictProblem A 409 Problem for a client. `existing_client` is present only for `client-name-taken`;
+// `entry_count` only for `client-in-use`.
+type ClientConflictProblem struct {
+	Detail     *string `json:"detail,omitempty"`
+	EntryCount *int32  `json:"entry_count,omitempty"`
+
+	// Errors Invalid fields, for validation problems only.
+	Errors         *[]ProblemField `json:"errors,omitempty"`
+	ExistingClient *Client         `json:"existing_client,omitempty"`
+
+	// RequestId Quote this when reporting a problem; it matches the server logs.
+	RequestId *string `json:"request_id,omitempty"`
+	Status    int32   `json:"status"`
+	Title     string  `json:"title"`
+
+	// Type Stable URN for the error kind, for example `urn:therapy-service-hours:problem:not-found`.
+	//
+	// Examples: urn:therapy-service-hours:problem:not-found
+	Type string `json:"type"`
+}
+
+// ClientListResponse defines model for ClientListResponse.
+type ClientListResponse struct {
+	Items []Client `json:"items"`
+
+	// Page Pagination metadata returned by every list endpoint.
+	Page PageInfo `json:"page"`
+}
+
+// ClientRequest Create or rename a client. Unknown fields are rejected.
+type ClientRequest struct {
+	// Name Pseudonym or initials only. Unique per user, ignoring case.
+	Name string `json:"name"`
+}
+
+// ConflictingEntry The caller's own session that an overlapping request clashes with.
+type ConflictingEntry struct {
+	// EndTime Local clock time `HH:MM` with no timezone, on the session date.
+	//
+	// Examples: 09:30
+	EndTime     SessionTime        `json:"end_time"`
+	Id          openapi_types.UUID `json:"id"`
+	SessionDate openapi_types.Date `json:"session_date"`
+
+	// StartTime Local clock time `HH:MM` with no timezone, on the session date.
+	//
+	// Examples: 09:30
+	StartTime SessionTime `json:"start_time"`
+}
+
+// Entry One of the caller's own entries. This is the owner's view only; peer and supervisor views
+// use their own schemas and never reference this one (ARC-18).
+type Entry struct {
+	// Category The category of an entry, with its group, so the table needs no second lookup.
+	Category CategoryRef `json:"category"`
+
+	// Clients The saved clients on this entry, ordered by name.
+	Clients   []Client  `json:"clients"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// DurationMinutes Calculated by the server from the times; never sent in a request.
+	DurationMinutes int32 `json:"duration_minutes"`
+
+	// EndTime Local clock time `HH:MM` with no timezone, on the session date.
+	//
+	// Examples: 09:30
+	EndTime *SessionTime `json:"end_time,omitempty"`
+
+	// Hours Calculated by the server, `duration_minutes / 60`, shown to two decimals. Never sent in a request.
+	Hours float64            `json:"hours"`
+	Id    openapi_types.UUID `json:"id"`
+
+	// NeedsTime True for entries imported without times; `start_time` and `end_time` are then absent.
+	NeedsTime bool `json:"needs_time"`
+
+	// Notes Pseudonyms or initials only. Absent when there are no notes.
+	Notes  *string `json:"notes,omitempty"`
+	OnSite bool    `json:"on_site"`
+
+	// ReviewNote The reviewer's reason, present on a rejected entry.
+	ReviewNote  *string            `json:"review_note,omitempty"`
+	ReviewedAt  *time.Time         `json:"reviewed_at,omitempty"`
+	SessionDate openapi_types.Date `json:"session_date"`
+
+	// StartTime Local clock time `HH:MM` with no timezone, on the session date.
+	//
+	// Examples: 09:30
+	StartTime *SessionTime `json:"start_time,omitempty"`
+	Status    EntryStatus  `json:"status"`
+	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// EntryConflictProblem A 409 Problem for an entry. `conflicting_entry` is present only for `entry-overlap`.
+type EntryConflictProblem struct {
+	// ConflictingEntry The caller's own session that an overlapping request clashes with.
+	ConflictingEntry *ConflictingEntry `json:"conflicting_entry,omitempty"`
+	Detail           *string           `json:"detail,omitempty"`
+
+	// Errors Invalid fields, for validation problems only.
+	Errors *[]ProblemField `json:"errors,omitempty"`
+
+	// RequestId Quote this when reporting a problem; it matches the server logs.
+	RequestId *string `json:"request_id,omitempty"`
+	Status    int32   `json:"status"`
+	Title     string  `json:"title"`
+
+	// Type Stable URN for the error kind, for example `urn:therapy-service-hours:problem:not-found`.
+	//
+	// Examples: urn:therapy-service-hours:problem:not-found
+	Type string `json:"type"`
+}
+
+// EntryListResponse defines model for EntryListResponse.
+type EntryListResponse struct {
+	Items []Entry `json:"items"`
+
+	// Page Pagination metadata returned by every list endpoint.
+	Page PageInfo `json:"page"`
+}
+
+// EntryRequest The editable fields of an entry, for create and for full replacement on update. There is no
+// `hours` or `duration_minutes`: the server calculates them, and unknown fields are rejected
+// (FR-LOG-02). Times are in 15-minute steps, the end is after the start, and a session does
+// not cross midnight, so `end_time` is at most `23:45`.
+type EntryRequest struct {
+	CategoryId openapi_types.UUID `json:"category_id"`
+
+	// ClientIds Saved clients on this entry; all must belong to the caller. Defaults to none.
+	ClientIds *[]openapi_types.UUID `json:"client_ids,omitempty"`
+
+	// EndTime Local clock time `HH:MM` with no timezone, on the session date.
+	//
+	// Examples: 09:30
+	EndTime SessionTime `json:"end_time"`
+
+	// Notes Pseudonyms or initials only; supervisors can read notes.
+	Notes       *string            `json:"notes,omitempty"`
+	OnSite      *bool              `json:"on_site,omitempty"`
+	SessionDate openapi_types.Date `json:"session_date"`
+
+	// StartTime Local clock time `HH:MM` with no timezone, on the session date.
+	//
+	// Examples: 09:30
+	StartTime SessionTime `json:"start_time"`
+}
+
+// EntryStatus defines model for EntryStatus.
+type EntryStatus string
 
 // GatewayUnauthorized defines model for GatewayUnauthorized.
 type GatewayUnauthorized struct {
@@ -120,6 +354,17 @@ type ProblemField struct {
 	Message string `json:"message"`
 }
 
+// SessionTime Local clock time `HH:MM` with no timezone, on the session date.
+//
+// Examples: 09:30
+type SessionTime = string
+
+// ClientId defines model for ClientId.
+type ClientId = openapi_types.UUID
+
+// EntryId defines model for EntryId.
+type EntryId = openapi_types.UUID
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = openapi_types.UUID
 
@@ -128,6 +373,16 @@ type Page = int32
 
 // PageSize defines model for PageSize.
 type PageSize = int32
+
+// BadRequest RFC 7807 problem details.
+type BadRequest = Problem
+
+// ClientConflict A 409 Problem for a client. `existing_client` is present only for `client-name-taken`;
+// `entry_count` only for `client-in-use`.
+type ClientConflict = ClientConflictProblem
+
+// EntryConflict A 409 Problem for an entry. `conflicting_entry` is present only for `entry-overlap`.
+type EntryConflict = EntryConflictProblem
 
 // Forbidden RFC 7807 problem details.
 type Forbidden = Problem
@@ -326,6 +581,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 
 	return r
 }
+
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type ClientConflictApplicationProblemPlusJSONResponse ClientConflictProblem
+
+type EntryConflictApplicationProblemPlusJSONResponse EntryConflictProblem
 
 type ForbiddenApplicationProblemPlusJSONResponse Problem
 
@@ -593,49 +854,80 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
