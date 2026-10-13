@@ -22,6 +22,23 @@ type SeedStore struct{ pool *pgxpool.Pool }
 // NewSeedStore adapts the shared IAM/TLS pool for the operator seed use case.
 func NewSeedStore(pool *pgxpool.Pool) *SeedStore { return &SeedStore{pool: pool} }
 
+// VerifyBinding uses a read-only transaction and returns one consistent snapshot.
+func (s *SeedStore) VerifyBinding(ctx context.Context, request seed.BindingRequest) (seed.BindingResult, error) {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return seed.BindingResult{}, fmt.Errorf("begin binding verification: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	row, err := identityqueries.New(tx).VerifySeedAdminBinding(ctx, identityqueries.VerifySeedAdminBindingParams{Email: request.Email, Subject: request.Subject})
+	if err != nil {
+		return seed.BindingResult{}, fmt.Errorf("read binding verification: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return seed.BindingResult{}, fmt.Errorf("commit binding verification: %w", err)
+	}
+	return seed.BindingResult{Users: row.Users, SubjectUsers: row.SubjectUsers, MatchingActiveAdmin: row.MatchingActiveAdmin, AcceptedInvitations: row.AcceptedInvitations}, nil
+}
+
 // Apply is serialized and atomic, including expired invitation renewal. Existing bound users,
 // deactivation, organization and role assignments are never overwritten by this bootstrap.
 func (s *SeedStore) Apply(ctx context.Context, plan seed.Plan) (seed.Result, error) {

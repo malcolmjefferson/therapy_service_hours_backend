@@ -45,6 +45,8 @@ jobs:
         run: go mod verify
       - name: Tests (GO-42, GO-72)
         run: go test -race -count=1 ./...
+      - name: Dev binding operator guards and privacy
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_verify_dev_binding.py
 
   vuln:
     name: govulncheck
