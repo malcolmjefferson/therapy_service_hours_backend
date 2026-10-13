@@ -25,6 +25,8 @@ type RouterDeps struct {
 	Now Clock
 	// ActorResolver authenticates protected routes; health never calls it.
 	ActorResolver ActorResolver
+	// Entries serves the log-hours endpoints.
+	Entries EntryLister
 }
 
 func (d RouterDeps) validate() error {
@@ -47,6 +49,9 @@ func (d RouterDeps) validate() error {
 	if d.ActorResolver == nil {
 		errs = append(errs, errors.New("actor resolver is required"))
 	}
+	if d.Entries == nil {
+		errs = append(errs, errors.New("entries service is required"))
+	}
 	return errors.Join(errs...)
 }
 
@@ -56,7 +61,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, err
 	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version}, deps.ActorResolver)
+	mountAPI(r, &server{version: deps.Version, entries: deps.Entries}, deps.ActorResolver)
 	return r, nil
 }
 

@@ -76,7 +76,7 @@ func TestNewRouter_RejectsMissingDependencies(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, want := range []string{"logger", "version", "max body bytes", "request ID generator", "clock"} {
+	for _, want := range []string{"logger", "version", "max body bytes", "request ID generator", "clock", "actor resolver", "entries service"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %q", err, want)
 		}

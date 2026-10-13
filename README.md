@@ -215,6 +215,31 @@ entry can only reference its owner's clients. Constraint tests: `internal/migrat
 on RDS PostgreSQL 13 and later, so the `migrator` role creates it without superuser rights; the
 baseline has already run on the dev database through the pipeline.
 
+## List entries endpoint (S2-06)
+
+`GET /api/v1/entries` returns the signed-in user's own entries. It never takes a user ID: the actor
+comes from the database-backed identity middleware, `authz.Self` runs in `entries.Service.List`, and
+every query is scoped to that user in SQL, so admin and supervisor roles see no one else's entries.
+
+| Query parameter | Rule |
+|---|---|
+| `group` | `direct`, `indirect` or `supervision`; anything else is 400 |
+| `client` | Case-insensitive substring of a client name, 1 to 64 characters after trimming. `%`, `_` and `\` match literally (escaped in the static SQL, SEC-25). Control characters, NUL and invalid UTF-8 are 400 |
+| `from`, `to` | Inclusive `session_date` bounds; `to` before `from` is 400 |
+| `sort`, `dir` | `session_date`, `category` (group, then name), `client`, `hours`, `on_site`; `asc` or `desc`. Anything else is 400. Defaults are newest first |
+| `page`, `page_size` | 1 to 100000 and 1 to 200, default 1 and 50. Out-of-range values are 400, not clamped |
+
+Every ordering ends in `id`, so pages do not repeat or skip rows when sort keys tie. The store reads the
+page, the total, the page's clients and the category names in one `REPEATABLE READ` read-only transaction,
+so `total_items` always agrees with the rows. The response is the owner DTO (`entryForOwner`), with `hours`
+derived from `duration_minutes` and rounded to two decimals; entries imported without times omit
+`start_time` and `end_time` and set `needs_time`.
+
+Layers: handler `internal/http/entries.go` (translate only), service `internal/service/entries`
+(authz, validation, defaults), store `internal/db/entries.go` (the S2-02 queries). Verify with Docker
+running: `go test -race ./internal/service/entries ./internal/http`. The PostgreSQL tests drive the real router,
+service and store end to end.
+
 ## Identity seed Lambda (S1-09)
 
 `cmd/seed` is invoked through IAM, with no public HTTP route. It connects as `app_rw` using

@@ -17,7 +17,6 @@ output-options:
     - createClient
     - renameClient
     - deleteClient
-    - listEntries
     - createEntry
     - getEntry
     - updateEntry

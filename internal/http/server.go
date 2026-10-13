@@ -20,6 +20,7 @@ import (
 // and use cases (GO-10).
 type server struct {
 	version string
+	entries EntryLister
 }
 
 var _ gen.StrictServerInterface = (*server)(nil)
