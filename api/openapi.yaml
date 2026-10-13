@@ -28,6 +28,12 @@ tags:
     description: Operational endpoints
   - name: identity
     description: Current authenticated user
+  - name: categories
+    description: Service categories (lookup data)
+  - name: clients
+    description: The current user's saved clients and groups (pseudonyms or initials only)
+  - name: entries
+    description: The current user's own hours entries
 paths:
   /me:
     get:
@@ -77,6 +83,346 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
         default:
           $ref: '#/components/responses/Problem'
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List the service categories, grouped for the entry form
+      description: |
+        Lookup data (FR-LOG-07): the 12 categories in display order, grouped Direct Service,
+        Indirect Service and Supervision. The list changes rarely, so the response is cacheable
+        by the browser. It is not paginated because it is small and fixed.
+      responses:
+        '200':
+          description: The categories, grouped, in display order.
+          headers:
+            Cache-Control:
+              description: Cacheable by the user's browser only, for example `private, max-age=3600`.
+              schema:
+                type: string
+                maxLength: 100
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+  /clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List the current user's saved clients
+      description: Only the caller's own clients are returned, ordered by name (case-insensitive), then `id`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of the caller's clients.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Save a new client
+      description: |
+        Names are unique per user, ignoring case. If the name is already saved, the API returns
+        **409** with problem type `urn:therapy-service-hours:problem:client-name-taken` and the
+        existing client in `existing_client`, so the form can select it instead. It does not
+        silently return the existing client.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientRequest'
+      responses:
+        '201':
+          description: The client was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/ClientConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /clients/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/ClientId'
+    patch:
+      operationId: renameClient
+      tags: [clients]
+      summary: Rename one of the caller's clients
+      description: |
+        A name that another of the caller's clients already uses (ignoring case) returns **409**
+        `urn:therapy-service-hours:problem:client-name-taken`. Changing only the letter case of the
+        client's own name is allowed. Another user's client is `404`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientRequest'
+      responses:
+        '200':
+          description: The renamed client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ClientConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Delete one of the caller's clients
+      description: |
+        A client that no entry uses is deleted. If entries use it and `confirm_detach` is not
+        `true`, the API returns **409** `urn:therapy-service-hours:problem:client-in-use` with
+        `entry_count`, so the UI can ask for confirmation. With `confirm_detach=true` the client is
+        removed from those entries and deleted. Another user's client is `404`.
+      parameters:
+        - name: confirm_detach
+          in: query
+          description: Set to `true` to delete a client that entries still use, detaching it from them.
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: The client was deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ClientConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /entries:
+    get:
+      operationId: listEntries
+      tags: [entries]
+      summary: List the caller's own entries
+      description: |
+        Filters combine with AND. `client` is a case-insensitive substring match against the
+        names of the clients on an entry; `%`, `_` and `\` in it match literally (SEC-20 to SEC-25).
+        `sort` and `dir` take only the listed values, anything else is **400**. The default order is
+        newest first (`session_date` descending, then start time descending). Sorting by `category`
+        orders by category group, then category name. Ties are broken by `id`, so pages are stable.
+      parameters:
+        - name: group
+          in: query
+          description: Only entries whose category is in this group.
+          required: false
+          schema:
+            $ref: '#/components/schemas/CategoryGroup'
+        - name: client
+          in: query
+          description: Only entries with a client whose name contains this text, ignoring case.
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+        - name: from
+          in: query
+          description: Earliest `session_date`, inclusive.
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Latest `session_date`, inclusive. Must not be before `from`.
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: sort
+          in: query
+          description: Column to sort by.
+          required: false
+          schema:
+            type: string
+            enum: [session_date, category, client, hours, on_site]
+            default: session_date
+        - name: dir
+          in: query
+          description: Sort direction.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of the caller's entries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createEntry
+      tags: [entries]
+      summary: Log a new entry
+      description: |
+        The server calculates `duration_minutes` and `hours` from the times; a request that sends
+        either (or any other unknown field) is **400** (FR-LOG-02). The new entry is `pending`.
+        A session that overlaps another of the caller's non-rejected sessions is **409**
+        `urn:therapy-service-hours:problem:entry-overlap`, naming the clashing session in
+        `conflicting_entry`. Repeating a request with the same `Idempotency-Key` and body returns
+        the original result.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+      responses:
+        '201':
+          description: The entry was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/EntryConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /entries/{entryId}:
+    parameters:
+      - $ref: '#/components/parameters/EntryId'
+    get:
+      operationId: getEntry
+      tags: [entries]
+      summary: Read one of the caller's entries
+      description: Another user's entry is `404`, never `403`, so its existence is not disclosed.
+      responses:
+        '200':
+          description: The entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: updateEntry
+      tags: [entries]
+      summary: Replace one of the caller's pending or rejected entries
+      description: |
+        Replaces every editable field, so omitted optional fields return to their defaults. Saving
+        an edited `rejected` entry sets it back to `pending`. An `approved` entry is locked and
+        returns **409** `urn:therapy-service-hours:problem:entry-locked`. An overlap returns **409**
+        `urn:therapy-service-hours:problem:entry-overlap`. Another user's entry is `404`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+      responses:
+        '200':
+          description: The updated entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/EntryConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: deleteEntry
+      tags: [entries]
+      summary: Delete one of the caller's pending or rejected entries
+      description: |
+        An `approved` entry is locked and returns **409** `urn:therapy-service-hours:problem:entry-locked`.
+        Another user's entry is `404`.
+      responses:
+        '204':
+          description: The entry was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/EntryConflict'
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     cognitoJwt:
@@ -120,6 +466,24 @@ components:
         type: string
         format: uuid
         maxLength: 36
+    EntryId:
+      name: entryId
+      in: path
+      description: Entry identifier.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
+    ClientId:
+      name: clientId
+      in: path
+      description: Client identifier.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
   responses:
     Unauthorized:
       description: |
@@ -151,6 +515,34 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    BadRequest:
+      description: |
+        The request is invalid: a field is missing, malformed or out of range, an unknown field was
+        sent (for example `hours`), or a query parameter is not allowed. `errors` lists the fields.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    EntryConflict:
+      description: |
+        The entry cannot be saved in its current state. `type` is
+        `urn:therapy-service-hours:problem:entry-overlap` (the session overlaps another of the
+        caller's non-rejected sessions; `conflicting_entry` names it) or
+        `urn:therapy-service-hours:problem:entry-locked` (the entry is approved and cannot change).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/EntryConflictProblem'
+    ClientConflict:
+      description: |
+        `type` is `urn:therapy-service-hours:problem:client-name-taken` (another of the caller's
+        clients has that name, ignoring case; `existing_client` is that client) or
+        `urn:therapy-service-hours:problem:client-in-use` (entries still use the client;
+        `entry_count` says how many; repeat with `confirm_detach=true` to delete it anyway).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ClientConflictProblem'
     Problem:
       description: An error, as RFC 7807 problem details.
       content:
@@ -196,6 +588,260 @@ components:
         name:
           type: string
           maxLength: 200
+    CategoryGroup:
+      type: string
+      description: The group a category belongs to. It decides which goals the hours count toward.
+      enum: [direct, indirect, supervision]
+    CategoryListResponse:
+      type: object
+      additionalProperties: false
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          maxItems: 3
+          description: Groups in display order, each with its categories in display order.
+          items:
+            $ref: '#/components/schemas/CategoryGroupSection'
+    CategoryGroupSection:
+      type: object
+      additionalProperties: false
+      required: [group, label, categories]
+      properties:
+        group:
+          $ref: '#/components/schemas/CategoryGroup'
+        label:
+          type: string
+          description: Display name, for example `Direct Service`.
+          maxLength: 50
+        categories:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/Category'
+    Category:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 100
+    CategoryRef:
+      type: object
+      description: The category of an entry, with its group, so the table needs no second lookup.
+      additionalProperties: false
+      required: [id, name, group]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 100
+        group:
+          $ref: '#/components/schemas/CategoryGroup'
+    Client:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          description: Pseudonym or initials only (CLAUDE.md section 0.7).
+          maxLength: 64
+    ClientRequest:
+      type: object
+      description: Create or rename a client. Unknown fields are rejected.
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Pseudonym or initials only. Unique per user, ignoring case.
+          minLength: 1
+          maxLength: 64
+    ClientListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/Client'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    SessionTime:
+      type: string
+      description: Local clock time `HH:MM` with no timezone, on the session date.
+      pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+      maxLength: 5
+      examples: ['09:30']
+    EntryStatus:
+      type: string
+      enum: [pending, approved, rejected]
+    Entry:
+      type: object
+      description: |
+        One of the caller's own entries. This is the owner's view only; peer and supervisor views
+        use their own schemas and never reference this one (ARC-18).
+      additionalProperties: false
+      required: [id, session_date, duration_minutes, hours, category, clients, on_site, status, needs_time, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        session_date:
+          type: string
+          format: date
+        start_time:
+          $ref: '#/components/schemas/SessionTime'
+        end_time:
+          $ref: '#/components/schemas/SessionTime'
+        duration_minutes:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1440
+          description: Calculated by the server from the times; never sent in a request.
+        hours:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 24
+          description: Calculated by the server, `duration_minutes / 60`, shown to two decimals. Never sent in a request.
+        category:
+          $ref: '#/components/schemas/CategoryRef'
+        clients:
+          type: array
+          maxItems: 50
+          description: The saved clients on this entry, ordered by name.
+          items:
+            $ref: '#/components/schemas/Client'
+        on_site:
+          type: boolean
+        notes:
+          type: string
+          maxLength: 2000
+          description: Pseudonyms or initials only. Absent when there are no notes.
+        status:
+          $ref: '#/components/schemas/EntryStatus'
+        needs_time:
+          type: boolean
+          description: True for entries imported without times; `start_time` and `end_time` are then absent.
+        review_note:
+          type: string
+          maxLength: 2000
+          description: The reviewer's reason, present on a rejected entry.
+        reviewed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EntryRequest:
+      type: object
+      description: |
+        The editable fields of an entry, for create and for full replacement on update. There is no
+        `hours` or `duration_minutes`: the server calculates them, and unknown fields are rejected
+        (FR-LOG-02). Times are in 15-minute steps, the end is after the start, and a session does
+        not cross midnight, so `end_time` is at most `23:45`.
+      additionalProperties: false
+      required: [session_date, start_time, end_time, category_id]
+      properties:
+        session_date:
+          type: string
+          format: date
+        start_time:
+          $ref: '#/components/schemas/SessionTime'
+        end_time:
+          $ref: '#/components/schemas/SessionTime'
+        category_id:
+          type: string
+          format: uuid
+          maxLength: 36
+        client_ids:
+          type: array
+          uniqueItems: true
+          maxItems: 50
+          description: Saved clients on this entry; all must belong to the caller. Defaults to none.
+          items:
+            type: string
+            format: uuid
+            maxLength: 36
+        on_site:
+          type: boolean
+          default: false
+        notes:
+          type: string
+          maxLength: 2000
+          description: Pseudonyms or initials only; supervisors can read notes.
+    EntryListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/Entry'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    ConflictingEntry:
+      type: object
+      description: The caller's own session that an overlapping request clashes with.
+      additionalProperties: false
+      required: [id, session_date, start_time, end_time]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        session_date:
+          type: string
+          format: date
+        start_time:
+          $ref: '#/components/schemas/SessionTime'
+        end_time:
+          $ref: '#/components/schemas/SessionTime'
+    EntryConflictProblem:
+      description: A 409 Problem for an entry. `conflicting_entry` is present only for `entry-overlap`.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            conflicting_entry:
+              $ref: '#/components/schemas/ConflictingEntry'
+    ClientConflictProblem:
+      description: |
+        A 409 Problem for a client. `existing_client` is present only for `client-name-taken`;
+        `entry_count` only for `client-in-use`.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            existing_client:
+              $ref: '#/components/schemas/Client'
+            entry_count:
+              type: integer
+              format: int32
+              minimum: 1
     GatewayUnauthorized:
       type: object
       required: [message]

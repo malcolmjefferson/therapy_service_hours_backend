@@ -8,7 +8,7 @@
 - **Slice S0 (walking skeleton):** 9 done, 0 in review, 0 in progress, 0 not started (of 9 tickets touching this repo).
 - **AWS:** dev deployed end to end by the pipeline on 2026-10-11 (data, migrate, api, web, smoke tests). Prod deploys are deferred to milestone M3 (owner decision 2026-10-11).
 - **S1:** execution started; ADR-0008â€“0011 accepted by the owner on 2026-10-11. 19 of 20 S1 tickets are done; S1-11 stays in progress for role-specific navigation that waits on later features. Cold-start evidence is recorded in ADR-0007 (no on-demand p99; accepted by the owner).
-- **S2 (log hours):** S2-01 in review (schema migration `00003_log_hours.sql`); the other backend S2 tickets are not started.
+- **S2 (log hours):** S2-01 done (schema migration `00003_log_hours.sql`, backend #32 merged); S2-03 in review (OpenAPI for categories, clients and entries). The other backend S2 tickets are not started.
 
 ## Tickets
 
@@ -48,4 +48,5 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 
 | ID | Title | Status | PRs | Notes |
 |---|---|---|---|---|
-| S2-01 | Migration: categories, clients, entries, entry_clients with DB constraints | in review | [backend #32](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/32) | Migration `00003_log_hours.sql` creates the four tables with the times columns from day one, the 12 seeded categories (CLAUDE.md §8) and every entry rule as a named DB constraint, including the per-user overlap exclusion. `btree_gist` is created by the baseline migration, which the pipeline already ran on dev RDS as `migrator`; prod is deferred to M3. Constraint tests cover each rule against PostgreSQL. This migration reaches dev with the next pipeline run after merge. |
+| S2-01 | Migration: categories, clients, entries, entry_clients with DB constraints | done | [backend #32](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/32) | Migration `00003_log_hours.sql` creates the four tables with the times columns from day one, the 12 seeded categories (CLAUDE.md §8) and every entry rule as a named DB constraint, including the per-user overlap exclusion. `btree_gist` is created by the baseline migration, which the pipeline already ran on dev RDS as `migrator`; prod is deferred to M3. Constraint tests cover each rule against PostgreSQL. Merged; it reaches dev with the next pipeline run. |
+| S2-03 | OpenAPI: categories, clients, entries | in review | PR pending | Contract only: `GET /categories`; `GET`/`POST /clients`, `PATCH`/`DELETE /clients/{clientId}`; `GET`/`POST /entries`, `GET`/`PUT`/`DELETE /entries/{entryId}`. Request schemas forbid unknown fields and carry no `hours`. The operations are excluded from route generation in `api/oapi-codegen.yaml` until S2-05 to S2-08 implement them. Unblocks frontend S2-11. |

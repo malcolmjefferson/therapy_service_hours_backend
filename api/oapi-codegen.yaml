@@ -8,3 +8,17 @@ generate:
   embedded-spec: true
 output-options:
   skip-prune: true
+  # S2-03 publishes the log-hours contract before S2-05 to S2-08 implement its routes. Generate the
+  # models now; each of those tickets removes its operations from this list so the strict server
+  # method becomes required.
+  exclude-operation-ids:
+    - listCategories
+    - listClients
+    - createClient
+    - renameClient
+    - deleteClient
+    - listEntries
+    - createEntry
+    - getEntry
+    - updateEntry
+    - deleteEntry
