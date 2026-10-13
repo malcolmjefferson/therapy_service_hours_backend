@@ -97,6 +97,54 @@ S1-18 remains in progress until the remaining identity/denial evidence and
 representative cold measurements are recorded. Memory stays at the approved 128 MiB
 with reserved/provisioned concurrency 1; no resource settings changed for sampling.
 
+## Cold-start evidence from existing dev logs (2026-10-13, S1-18)
+
+The owner chose to record the existing CloudWatch evidence rather than run a separate
+cold-start probe. A throwaway version could not be published without editing `$LATEST`
+(publishing returned the existing version 5), and one direct invocation of `$LATEST` was
+throttled with `ReservedFunctionConcurrentInvocationLimitExceeded`. With reserved and
+provisioned concurrency both 1, the live alias has no on-demand path, so no on-demand cold
+start can be measured, and none can occur: a second concurrent sign-up is throttled rather
+than cold-started. No dev resource was changed.
+
+Source: the `therapy-service-hours-dev-presignup` log group (32 log streams, one per execution
+environment, versions 1 to 5, 2026-10-11T21:34Z to 2026-10-13T03:29Z), read once with a
+`REPORT RequestId` / `INIT_REPORT` filter and no application log lines. Environments per
+version: 4, 4, 15, 7 and 2. Inputs were the real deployed traffic and the earlier fixed
+fictional synthetic fixtures; no identifiers are recorded here.
+
+| Measure | n | Result |
+|---|--:|---|
+| `INIT_REPORT` init duration | 32 | min 1851.53 ms, median 2063.66 ms, p95 3057.93 ms, max 3064.99 ms |
+| First invocation on a new environment | 7 | 45.12, 72.33, 73.73, 315.58, 332.91, 625.29, 1468.81 ms (median 315.58 ms) |
+| Warm invocations | 113 | min 1.26 ms, median 3.04 ms, p95 46.95 ms, p99 71.82 ms, max 342.45 ms |
+
+Twenty-six of the 32 init durations are 1.85 to 2.37 s. The six slowest are 2.60, 2.63, 2.81,
+2.93, 3.06 and 3.06 s.
+
+**Caveats.**
+
+- **The sample is small.** With 32 init durations the nearest-rank p99 is the maximum, and with 7
+  first-invocation samples no p99 is meaningful. This is not a p99 and is not recorded as one.
+- **These are not on-demand cold starts.** None of the 120 `REPORT` lines carries an
+  `Init Duration`, and 25 of the 32 environments never served a request. That is consistent
+  with every initialisation being a proactive provisioned-concurrency (re)initialisation outside any
+  Cognito request, but the log lines alone do not prove it. The 7 first invocations are the
+  closest evidence of what Cognito sees on a fresh environment.
+- **The headroom is thin.** Arithmetic, not a paired measurement: the worst init (3.06 s) plus the
+  worst first invocation (1.47 s) is about 4.53 s, under the 5-second ceiling by about 0.47 s. That
+  would matter only if an on-demand cold path ever existed, which the current concurrency settings
+  prevent.
+- **Not end to end.** The numbers cover Lambda initialisation and the first invocation including
+  the database connection. They do not include Cognito's own time.
+
+**Conclusion.** The evidence supports provisioned concurrency of 1 as the mitigation: the trigger
+answered inside the budget on every recorded first invocation, and warm requests are far below it.
+It does not establish a cold-start p99. If a representative on-demand p99 is wanted later, the
+approach is a throwaway sibling function without reserved or provisioned concurrency (same code,
+VPC, role and settings), one invocation per forced fresh environment, about 100 samples, deleted
+afterwards. That would create a dev resource and was not run.
+
 ## Remaining open items
 
 - Decide the exact memory size for the trigger, which sets the provisioned-concurrency cost.
