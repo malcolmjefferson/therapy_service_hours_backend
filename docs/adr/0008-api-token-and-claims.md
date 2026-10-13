@@ -127,13 +127,14 @@ Backend #25 and frontend #22 merged. Combined dev execution
 explicitly passing in pipeline smoke and no accounts/invitations/renewals/native
 users created by the repeated seed step.
 
-Backend #29 prepares an IAM-only, dev-only read operation for the existing seed
+Backend #29 merged an IAM-only, dev-only read operation for the existing seed
 Lambda. A read-only SQL snapshot returns matching user/subject/admin/accepted
 invitation counts. The operator helper obtains the Google subject from the
 validated dev pool without exposing it; verification never applies a seed plan
 or repairs an account. The event omits the legacy admin email so older binaries
 refuse before storage. See the [verification runbook](../runbooks/dev-binding-verification.md).
-Actual persisted owner binding remains unverified until this operation releases
+Its dev release `7969a830-cd94-41da-bf97-6693b389e17d` is running. Actual persisted
+owner binding remains unverified until this operation releases
 and is run before and after another real sign-in. Cold p99 and real Google
 uninvited/deactivated demo remain separate open evidence items.
 

@@ -19,7 +19,7 @@ An invited Google account signs in and sees its name and role-based navigation; 
 
 **16 done** · **4 in progress** · **0 in review** · **0 not started**
 
-Backend #25 role-authority tests and frontend #22 native-browser automation are merged. Combined release d41c4fb4-4e96-42d8-98bc-67da2a878869 succeeded with both native browser cases passing in pipeline smoke and zero-change repeat seed. Real owner Google sign-in/repeat/logout/reload, one verified Cognito identity and zero-change repeat seed are verified. Backend #29 prepares read-only persisted binding proof. Cold p99 and real Google uninvited/deactivated acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled.
+Backend #25 role-authority tests and frontend #22 native-browser automation are merged. Combined release d41c4fb4-4e96-42d8-98bc-67da2a878869 succeeded with both native browser cases passing in pipeline smoke and zero-change repeat seed. Real owner Google sign-in/repeat/logout/reload, one verified Cognito identity and zero-change repeat seed are verified. Backend #29 read-only binding verification is merged; its dev release 7969a830-cd94-41da-bf97-6693b389e17d is running. Actual persisted binding proof, cold p99 and real Google uninvited/deactivated acceptance remain open. The owner retains the sole dev admin; prod auth/deploy remain disabled.
 
 **Status legend:** done = merged implementation; in progress = partial implementation or remaining acceptance; in review = open PR; not started = implementation has not begun. Completion notes distinguish dev verification from deferred prod/manual acceptance. Acceptance checkboxes are not automatically checked from merge status.
 
@@ -237,9 +237,9 @@ CDK auth construct in the data stack (ADR-0009, the pool is stateful): user pool
 
 **Completion / progress**
 
-Real owner Google sign-in/repeat/logout/reload and one enabled verified Cognito identity are verified. Backend #29 prepares dev-only read-only database binding verification through the existing IAM seed Lambda, with count-only output and an account/pool/identity-guarded operator helper. PostgreSQL snapshots prove no mutation across pending, bound/repeated, mismatch, demotion and deactivation; prod/input/legacy/privacy/cleanup tests pass. Actual persisted owner binding must be verified after its release. Representative cold p99 and real Google uninvited/deactivated acceptance remain open; prior 99 warm samples have p99/max 54.37 ms.
+Real owner Google sign-in/repeat/logout/reload and one enabled verified Cognito identity are verified. Backend #29 is merged at 4b61aec5779b3a722a2342c8d521851760ca88bd; release 7969a830-cd94-41da-bf97-6693b389e17d is running. It adds dev-only read-only database binding verification through the IAM seed Lambda, with count-only output and account/pool/identity guards. PostgreSQL no-mutation, prod/input/legacy/privacy/cleanup tests pass, as do all ten PR gates. A small Windows CLI UTF-8/status follow-up is separate. Actual persisted owner binding must be verified after release; cold p99 and real Google denial acceptance remain open. Prior 99 warm samples have p99/max 54.37 ms.
 
-Open PRs: [backend #29](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/29).
+Merged PRs: [backend #29](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/29).
 
 **Description**
 
@@ -253,7 +253,7 @@ Second half of the spike, once the pool exists. Prove on dev what ADR-0007 and A
 
 **Definition of Done**
 
-- [ ] Implementation merged
+- [x] Implementation merged
 - [ ] Validation: automated tests (and manual steps where noted) pass
 - [ ] Documentation: reviewer verification steps in the PR; OpenAPI/CLAUDE.md updated if a contract changed
 
