@@ -12,3 +12,12 @@ sql:
         overrides:
           - db_type: citext
             go_type: string
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/loghours
+    gen:
+      go:
+        package: loghoursqueries
+        out: internal/db/loghoursqueries
+        sql_package: pgx/v5
+        emit_empty_slices: true
