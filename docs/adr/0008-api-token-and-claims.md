@@ -101,6 +101,25 @@ Backend #28 compares only the provider label without case sensitivity and preser
 the username, verified-email requirement and invitation authority. Actual first/repeat
 Google identity creation/binding and logout must be rechecked after that release.
 
+### Post-fix acceptance (2026-10-12)
+
+Backend #28 merged and deployed in successful execution
+`11d38ada-a392-471f-bf45-81592cedf9a5`; the live trigger is version 4.
+The owner reported successful real Google sign-in. Browser verification then
+observed the database-backed admin profile, sign-out returning through hosted
+logout to the signed-out landing, repeat Google sign-in and page-reload
+reauthentication. No owner credentials or callback material were retained.
+Screenshots remain local and are not included in the public repository.
+
+The repeat enabled seed step reported zero accounts, invitations, renewals and
+native Cognito users created. A read-only Cognito check after repeat sign-ins
+finds exactly one matching, enabled federated Google identity with verified
+email; only counts and booleans were retained. Native invited/uninvited Gateway acceptance and
+deployed browser rendering were verified separately. This establishes functional
+real-owner sign-in and logout; it does not independently count the persisted
+owner binding or demonstrate real uninvited/deactivated Google accounts.
+Those evidence items and representative cold p99 remain open in S1-18.
+
 ## Remaining open items
 
 - Revisit if a machine client ever needs the API (it would use the access token and its own routes).

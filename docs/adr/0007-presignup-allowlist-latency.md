@@ -90,8 +90,10 @@ only case, version and durations were retained.
 
 This is a warm synthetic admission measurement, not actual Google federation,
 end-to-end Cognito latency or a cold-start p99 distribution. The actual Google
-attempt exposed the provider-prefix case bug recorded in ADR-0008. S1-18 remains
-in progress until that fix is released, first/repeat federation is verified and
+attempt exposed the provider-prefix case bug recorded in ADR-0008. Backend #28
+subsequently released in successful execution `11d38ada-a392-471f-bf45-81592cedf9a5`,
+and actual owner Google sign-in, repeat sign-in, logout and reload now pass.
+S1-18 remains in progress until the remaining identity/denial evidence and
 representative cold measurements are recorded. Memory stays at the approved 128 MiB
 with reserved/provisioned concurrency 1; no resource settings changed for sampling.
 
