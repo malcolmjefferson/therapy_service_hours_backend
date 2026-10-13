@@ -138,6 +138,23 @@ owner binding remains unverified until this operation releases
 and is run before and after another real sign-in. Cold p99 and real Google
 uninvited/deactivated demo remain separate open evidence items.
 
+### Persisted binding and real uninvited denial (2026-10-12)
+
+Release `7969a830-cd94-41da-bf97-6693b389e17d` succeeded with backend #29.
+Both native browser cases passed in pipeline smoke, and repeat seeding created
+or renewed nothing. Read-only owner checks before and after another real Google
+sign-in each returned one Google identity and exactly one user, subject match,
+active admin and accepted invitation. The counts remained unchanged; no identity
+attributes or credentials were retained in the proof results.
+
+A separate uninvited Google account completed basic identity consent and reached
+the application's access-denied view. It had zero Cognito identities before and
+after the attempt. The corresponding safe trigger log records
+`SIGN_UP_NOT_ALLOWED`, handler duration 69 ms, version 5. Screenshots remain local
+outside the public repositories. This establishes the invited/repeated binding
+and uninvited refusal paths. It does not establish cold-start p99 or the separate
+returning-deactivated-account slice demo.
+
 ## Remaining open items
 
 - Revisit if a machine client ever needs the API (it would use the access token and its own routes).
