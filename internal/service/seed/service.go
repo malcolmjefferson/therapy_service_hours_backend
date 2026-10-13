@@ -37,9 +37,10 @@ type Result struct {
 	InvitationsRenewed int64 `json:"invitations_renewed"`
 }
 
-// Store applies the complete plan in one transaction.
+// Store applies a complete seed plan or reads binding counts without mutation.
 type Store interface {
 	Apply(context.Context, Plan) (Result, error)
+	VerifyBinding(context.Context, BindingRequest) (BindingResult, error)
 }
 
 // Service validates operator input and enforces the dev/prod boundary.

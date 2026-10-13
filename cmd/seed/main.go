@@ -63,6 +63,14 @@ func (s *lazyStore) Apply(ctx context.Context, plan service.Plan) (service.Resul
 	return db.NewSeedStore(pool).Apply(ctx, plan)
 }
 
+func (s *lazyStore) VerifyBinding(ctx context.Context, request service.BindingRequest) (service.BindingResult, error) {
+	pool, err := s.connection(ctx)
+	if err != nil {
+		return service.BindingResult{}, err
+	}
+	return db.NewSeedStore(pool).VerifyBinding(ctx, request)
+}
+
 func (s *lazyStore) connection(ctx context.Context) (*pgxpool.Pool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

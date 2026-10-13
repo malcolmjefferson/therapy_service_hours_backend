@@ -20,6 +20,10 @@ func (r runner) Run(context.Context, service.Request) (service.Result, error) {
 	return service.Result{AccountsCreated: 1}, r.err
 }
 
+func (r runner) VerifyBinding(context.Context, service.BindingRequest) (service.BindingResult, error) {
+	return service.BindingResult{Users: 1, SubjectUsers: 1, MatchingActiveAdmin: 1, AcceptedInvitations: 1}, r.err
+}
+
 func TestSeedTransportNeverExposesIdentityOrRawErrors(t *testing.T) {
 	for _, tc := range []struct {
 		err  error
@@ -32,7 +36,7 @@ func TestSeedTransportNeverExposesIdentityOrRawErrors(t *testing.T) {
 		t.Run(tc.code, func(t *testing.T) {
 			var logs bytes.Buffer
 			h, _ := transport.New(runner{err: tc.err}, slog.New(slog.NewJSONHandler(&logs, nil)))
-			response, err := h.Handle(t.Context(), service.Request{AdminEmail: "admin@example.test"})
+			response, err := h.Handle(t.Context(), transport.Request{Request: service.Request{AdminEmail: "admin@example.test"}})
 			if err != nil || response.Status != "error" || response.Code != tc.code || response.AccountsCreated != 0 {
 				t.Fatalf("unexpected response: %+v", response)
 			}

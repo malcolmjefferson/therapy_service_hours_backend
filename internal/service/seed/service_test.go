@@ -22,6 +22,11 @@ func (s *store) Apply(_ context.Context, plan seed.Plan) (seed.Result, error) {
 	return seed.Result{AccountsCreated: int64(len(plan.Accounts))}, s.err
 }
 
+func (s *store) VerifyBinding(_ context.Context, _ seed.BindingRequest) (seed.BindingResult, error) {
+	s.calls++
+	return seed.BindingResult{}, s.err
+}
+
 func TestEnvironmentAndInputGuardsRunBeforeStorage(t *testing.T) {
 	for _, tc := range []struct {
 		name, env, email string

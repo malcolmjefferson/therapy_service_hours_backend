@@ -148,3 +148,40 @@ func (q *Queries) RevokeExpiredSeedInvitation(ctx context.Context, arg RevokeExp
 	}
 	return result.RowsAffected(), nil
 }
+
+const verifySeedAdminBinding = `-- name: VerifySeedAdminBinding :one
+SELECT
+    (SELECT count(*) FROM users WHERE email = $1::citext) AS users,
+    (SELECT count(*) FROM users WHERE cognito_sub = $2::text) AS subject_users,
+    (SELECT count(*) FROM users u JOIN organizations o ON o.id = u.organization_id
+     WHERE u.email = $1::citext AND u.cognito_sub = $2::text
+       AND u.status = 'active' AND u.is_admin AND o.name = 'Default Organization') AS matching_active_admin,
+    (SELECT count(*) FROM invitations i JOIN users u ON u.email = i.email AND u.organization_id = i.organization_id
+     WHERE u.email = $1::citext AND u.cognito_sub = $2::text
+       AND i.status = 'accepted' AND i.accepted_at IS NOT NULL) AS accepted_invitations
+`
+
+type VerifySeedAdminBindingParams struct {
+	Email   string
+	Subject string
+}
+
+type VerifySeedAdminBindingRow struct {
+	Users               int64
+	SubjectUsers        int64
+	MatchingActiveAdmin int64
+	AcceptedInvitations int64
+}
+
+// One snapshot, bound parameters, no writes or identity attributes in the result.
+func (q *Queries) VerifySeedAdminBinding(ctx context.Context, arg VerifySeedAdminBindingParams) (VerifySeedAdminBindingRow, error) {
+	row := q.db.QueryRow(ctx, verifySeedAdminBinding, arg.Email, arg.Subject)
+	var i VerifySeedAdminBindingRow
+	err := row.Scan(
+		&i.Users,
+		&i.SubjectUsers,
+		&i.MatchingActiveAdmin,
+		&i.AcceptedInvitations,
+	)
+	return i, err
+}
