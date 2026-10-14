@@ -13,7 +13,6 @@ output-options:
   # method becomes required. S2-07 (clients) is implemented, so its operations are no longer excluded.
   exclude-operation-ids:
     - listCategories
-    - listEntries
     - createEntry
     - getEntry
     - updateEntry

@@ -21,6 +21,7 @@ import (
 // and use cases (GO-10).
 type server struct {
 	version string
+	entries EntryLister
 	clients ClientService
 }
 

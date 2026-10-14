@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
 )
 
 // logSink collects JSON log lines written during a test.
@@ -56,8 +57,17 @@ func testDeps(sink *logSink) RouterDeps {
 		ActorResolver: resolverFunc(func(context.Context, map[string]string) (domain.Actor, error) {
 			return domain.Actor{}, domain.ErrForbidden
 		}),
+		Entries: entryListerFunc(func(context.Context, domain.Actor, entries.ListRequest) (entries.Page, error) {
+			return entries.Page{}, domain.ErrForbidden
+		}),
 		Clients: &fakeClients{},
 	}
+}
+
+type entryListerFunc func(context.Context, domain.Actor, entries.ListRequest) (entries.Page, error)
+
+func (f entryListerFunc) List(ctx context.Context, a domain.Actor, r entries.ListRequest) (entries.Page, error) {
+	return f(ctx, a, r)
 }
 
 type resolverFunc func(context.Context, map[string]string) (domain.Actor, error)

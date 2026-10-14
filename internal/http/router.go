@@ -28,6 +28,8 @@ type RouterDeps struct {
 	Now Clock
 	// ActorResolver authenticates protected routes; health never calls it.
 	ActorResolver ActorResolver
+	// Entries serves the log-hours endpoints.
+	Entries EntryLister
 	// Clients is the saved-clients use case (S2-07).
 	Clients ClientService
 }
@@ -52,6 +54,9 @@ func (d RouterDeps) validate() error {
 	if d.ActorResolver == nil {
 		errs = append(errs, errors.New("actor resolver is required"))
 	}
+	if d.Entries == nil {
+		errs = append(errs, errors.New("entries service is required"))
+	}
 	if d.Clients == nil {
 		errs = append(errs, errors.New("clients service is required"))
 	}
@@ -68,7 +73,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, fmt.Errorf("load embedded OpenAPI spec: %w", err)
 	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version, clients: deps.Clients}, deps.ActorResolver, spec)
+	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients}, deps.ActorResolver, spec)
 	return r, nil
 }
 

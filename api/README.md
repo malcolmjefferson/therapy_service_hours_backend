@@ -5,7 +5,7 @@
 ## Workflow for a contract change
 
 S2-03 defines the log-hours contract (categories, clients, entries) before S2-05 to S2-08
-implement it. The generator excludes the operations that are not implemented yet from route generation
+implement it; S2-06 and S2-07 have implemented `listEntries` and the client operations. The generator excludes the operations that are not implemented yet from route generation
 (`exclude-operation-ids` in `api/oapi-codegen.yaml`) while retaining their models, and the embedded
 server spec is filtered too; the full published contract remains `api/openapi.yaml`. When a ticket
 implements an operation, it removes that operation from the list, implements the strict handler and
