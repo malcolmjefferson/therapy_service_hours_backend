@@ -20,9 +20,10 @@ import (
 // api/openapi.yaml at compile time (GO-52, ADR-0006). Handlers only translate between HTTP
 // and use cases (GO-10).
 type server struct {
-	version string
-	entries EntryLister
-	clients ClientService
+	version    string
+	entries    EntryLister
+	clients    ClientService
+	categories CategoryService
 }
 
 var _ gen.StrictServerInterface = (*server)(nil)

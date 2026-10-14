@@ -60,7 +60,8 @@ func testDeps(sink *logSink) RouterDeps {
 		Entries: entryListerFunc(func(context.Context, domain.Actor, entries.ListRequest) (entries.Page, error) {
 			return entries.Page{}, domain.ErrForbidden
 		}),
-		Clients: &fakeClients{},
+		Clients:    &fakeClients{},
+		Categories: &fakeCategories{},
 	}
 }
 

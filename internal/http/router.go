@@ -32,6 +32,8 @@ type RouterDeps struct {
 	Entries EntryLister
 	// Clients is the saved-clients use case (S2-07).
 	Clients ClientService
+	// Categories is the category lookup use case (S2-08).
+	Categories CategoryService
 }
 
 func (d RouterDeps) validate() error {
@@ -60,6 +62,9 @@ func (d RouterDeps) validate() error {
 	if d.Clients == nil {
 		errs = append(errs, errors.New("clients service is required"))
 	}
+	if d.Categories == nil {
+		errs = append(errs, errors.New("categories service is required"))
+	}
 	return errors.Join(errs...)
 }
 
@@ -73,7 +78,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, fmt.Errorf("load embedded OpenAPI spec: %w", err)
 	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients}, deps.ActorResolver, spec)
+	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients, categories: deps.Categories}, deps.ActorResolver, spec)
 	return r, nil
 }
 
