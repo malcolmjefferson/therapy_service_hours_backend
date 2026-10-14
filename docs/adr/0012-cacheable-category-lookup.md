@@ -1,6 +1,6 @@
 # ADR-0012: The category lookup is the one API response a browser may cache
 
-- **Status:** Proposed · **Date:** 2026-10-14 · **Deciders:** project owner
+- **Status:** Accepted · **Date:** 2026-10-14 (accepted 2026-10-14) · **Deciders:** project owner
 - **Related:** FR-LOG-07, SEC-33 · Tickets: S2-03, S2-08
 
 ## Context
