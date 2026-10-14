@@ -23,6 +23,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
 	httpapi "github.com/malcolmjefferson/therapy_service_hours_backend/internal/http"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/migrate"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/categories"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/testpg"
@@ -71,6 +72,10 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	categoryService, err := categories.New(db.NewCategoryStore(pool))
+	if err != nil {
+		t.Fatal(err)
+	}
 	e.router, err = httpapi.NewRouter(httpapi.RouterDeps{
 		Logger:        quietLogger(),
 		Version:       "test",
@@ -80,6 +85,7 @@ func newEnv(t *testing.T) *env {
 		ActorResolver: actorFunc(func(context.Context, map[string]string) (domain.Actor, error) { return e.actor, nil }),
 		Entries:       service,
 		Clients:       clientService,
+		Categories:    categoryService,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -525,5 +531,46 @@ func TestListEntries_CountAgreesWithTheRowsAcrossFilters(t *testing.T) {
 	got := e.list(q("from", "2026-10-03", "to", "2026-10-10", "page_size", "3", "page", "3"))
 	if got.Page.TotalItems != 8 || len(got.Items) != 2 {
 		t.Errorf("total %d with %d items on the last page, want 8 and 2", got.Page.TotalItems, len(got.Items))
+	}
+}
+
+// TestListCategories_ServesTheSeededGroupsThroughTheRealRouter runs GET /categories through the real
+// router, service and store against PostgreSQL (S2-08).
+func TestListCategories_ServesTheSeededGroupsThroughTheRealRouter(t *testing.T) {
+	e := newEnv(t)
+	e.actor = e.user("a@example.test")
+	event := events.APIGatewayV2HTTPRequest{RawPath: httpapi.BasePath + "/categories"}
+	event.RequestContext.HTTP.Method = http.MethodGet
+	event.RequestContext.Authorizer = &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{JWT: &events.APIGatewayV2HTTPRequestContextAuthorizerJWTDescription{Claims: map[string]string{"sub": "s"}}}
+	res, err := apigw.Handler(e.router, httpapi.ContextWithRequestID)(e.t.Context(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusOK || res.Headers["Cache-Control"] != "private, max-age=3600" {
+		t.Fatalf("status = %d, Cache-Control = %q, body %s", res.StatusCode, res.Headers["Cache-Control"], res.Body)
+	}
+	var body struct {
+		Groups []struct {
+			Group      string `json:"group"`
+			Label      string `json:"label"`
+			Categories []struct {
+				Name string `json:"name"`
+			} `json:"categories"`
+		} `json:"groups"`
+	}
+	if err := json.Unmarshal([]byte(res.Body), &body); err != nil {
+		t.Fatal(err)
+	}
+	wantCounts := map[string]int{"direct": 5, "indirect": 5, "supervision": 2}
+	if len(body.Groups) != 3 || body.Groups[0].Group != "direct" || body.Groups[1].Group != "indirect" || body.Groups[2].Group != "supervision" {
+		t.Fatalf("groups = %+v", body.Groups)
+	}
+	for _, g := range body.Groups {
+		if len(g.Categories) != wantCounts[g.Group] {
+			t.Errorf("%s has %d categories, want %d", g.Group, len(g.Categories), wantCounts[g.Group])
+		}
+	}
+	if body.Groups[0].Label != "Direct Service" || body.Groups[0].Categories[0].Name != "Individual Counseling" || body.Groups[2].Categories[1].Name != "Individual Supervision" {
+		t.Errorf("order or labels wrong: %+v", body.Groups)
 	}
 }
