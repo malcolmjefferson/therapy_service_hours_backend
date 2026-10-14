@@ -15,6 +15,7 @@ Format: lightweight [MADR](https://adr.github.io/madr/). Status values: **Propos
 | [0009](0009-cognito-pool-placement.md) | The user pool lives in the data stack; callback URLs come from config | Accepted | S1 | §4 diagram, §4.2 |
 | [0010](0010-invitation-lifecycle.md) | Invitation lifecycle and just-in-time user provisioning | Accepted | S1 | §9 (invitations columns) |
 | [0011](0011-automated-sign-in-testing.md) | Automated sign-in tests use a dev-only password app client | Accepted | S1 | §14 (testing strategy) |
+| [0012](0012-cacheable-category-lookup.md) | The category lookup is the one API response a browser may cache | Accepted | S2-08 | §10 (SEC-33 exception) |
 
 ## Deviations and refinements to CLAUDE.md (apply after acceptance)
 
@@ -31,6 +32,7 @@ Format: lightweight [MADR](https://adr.github.io/madr/). Status values: **Propos
 8. **ADR-0010** adds `expires_at` and `status` to `invitations` and provisions the `users` row on
    first sign-in.
 9. **ADR-0011** allows a password-based app client in dev only, for automated sign-in tests.
+10. **ADR-0012** lets `GET /categories` answer `private, max-age=3600` instead of `no-store`, as the one recorded exception to SEC-33.
 
 ## Template
 
