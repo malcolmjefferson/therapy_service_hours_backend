@@ -46,6 +46,14 @@ type EntryClient struct {
 	UserID   pgtype.UUID
 }
 
+type Goal struct {
+	ID                    pgtype.UUID
+	UserID                pgtype.UUID
+	GoalType              string
+	TargetHours           pgtype.Int4
+	LastCelebratedPercent int16
+}
+
 type IdempotencyKey struct {
 	UserID              pgtype.UUID
 	Key                 pgtype.UUID
