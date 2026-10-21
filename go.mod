@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/config v1.33.9
 	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.7.6
-	github.com/aws/aws-sdk-go-v2/service/lambda v1.112.1
+	github.com/aws/aws-sdk-go-v2/service/lambda v1.113.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.4
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-chi/chi/v5 v5.3.2
