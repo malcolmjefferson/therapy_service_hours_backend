@@ -43,18 +43,31 @@ jobs:
           go-version-file: go.mod
       - name: Verify modules (SEC-70)
         run: go mod verify
-      - name: Pre-pull the PostgreSQL test image (once, with retries)
+      - name: Pre-pull the PostgreSQL test image (once, with retries and a mirror)
         # `go test ./...` runs the integration packages in parallel, and each one used to pull the image
-        # itself. The anonymous public.ecr.aws limit then failed whole runs ("toomanyrequests", "No such
-        # image") before any test ran. One pull with backoff leaves the image local for all of them.
-        # The image is read from internal/testpg so the two cannot drift.
+        # itself. The anonymous public.ecr.aws limit then failed whole runs ("toomanyrequests", "Data
+        # limit exceeded", "No such image") before any test ran, and the limit can last several minutes.
+        # One pull leaves the image local for all of them; if the primary registry stays limited, the
+        # same image is pulled from Google's anonymous Docker Hub mirror and tagged with the primary
+        # name, so testcontainers finds it locally. The image is read from internal/testpg so they
+        # cannot drift.
         run: |
           image="$(sed -n 's/^const Image = "\(.*\)"$/\1/p' internal/testpg/testpg.go)"
           test -n "$image"
-          for attempt in 1 2 3 4 5; do
+          mirror="mirror.gcr.io/library/${image#public.ecr.aws/docker/library/}"
+          test "$mirror" != "mirror.gcr.io/library/$image"
+          for attempt in 1 2 3; do
             docker pull "$image" && exit 0
-            echo "pull attempt $attempt failed; retrying"
-            sleep $((attempt * 20))
+            echo "pull attempt $attempt from $image failed; retrying"
+            sleep $((attempt * 15))
+          done
+          for attempt in 1 2 3; do
+            if docker pull "$mirror"; then
+              docker tag "$mirror" "$image"
+              exit 0
+            fi
+            echo "pull attempt $attempt from $mirror failed; retrying"
+            sleep $((attempt * 15))
           done
           exit 1
       - name: Tests (GO-42, GO-72)
