@@ -71,6 +71,23 @@ func (f entryListerFunc) List(ctx context.Context, a domain.Actor, r entries.Lis
 	return f(ctx, a, r)
 }
 
+// The write paths are covered by fakeEntries in entries_write_test.go; a list-only fake refuses them.
+func (entryListerFunc) Get(context.Context, domain.Actor, string) (domain.Entry, error) {
+	return domain.Entry{}, domain.ErrForbidden
+}
+
+func (entryListerFunc) Create(context.Context, domain.Actor, entries.Input) (domain.Entry, error) {
+	return domain.Entry{}, domain.ErrForbidden
+}
+
+func (entryListerFunc) Update(context.Context, domain.Actor, string, entries.Input) (domain.Entry, error) {
+	return domain.Entry{}, domain.ErrForbidden
+}
+
+func (entryListerFunc) Delete(context.Context, domain.Actor, string) error {
+	return domain.ErrForbidden
+}
+
 type resolverFunc func(context.Context, map[string]string) (domain.Actor, error)
 
 func (f resolverFunc) Resolve(ctx context.Context, claims map[string]string) (domain.Actor, error) {

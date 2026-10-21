@@ -15,12 +15,13 @@ import (
 // fakeStore records the call and returns canned rows. It never touches a database (GO-17: the
 // PostgreSQL adapter has its own contract tests in store_test.go).
 type fakeStore struct {
-	calls  int
-	userID string
-	query  entries.ListQuery
-	items  []domain.Entry
-	total  int64
-	err    error
+	entries.Writer // The write paths have their own tests; calling one here is a bug in the test.
+	calls          int
+	userID         string
+	query          entries.ListQuery
+	items          []domain.Entry
+	total          int64
+	err            error
 }
 
 func (f *fakeStore) ListEntries(_ context.Context, userID string, q entries.ListQuery) ([]domain.Entry, int64, error) {

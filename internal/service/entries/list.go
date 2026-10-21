@@ -53,8 +53,10 @@ type ListQuery struct {
 // Offset is the number of matching rows before the requested page.
 func (q ListQuery) Offset() int { return (q.Page - 1) * q.PageSize }
 
-// Store reads entries for the service.
+// Store reads and changes entries for the service.
 type Store interface {
+	Writer
+
 	// ListEntries returns one page of userID's own entries, with their category and clients, in the
 	// order and window q describes, together with the total number of entries matching the filters.
 	// It never returns another user's entries. A page past the end is empty, not an error.

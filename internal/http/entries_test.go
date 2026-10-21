@@ -32,7 +32,7 @@ var entriesActor = domain.Actor{
 var entriesClaims = map[string]string{"sub": "trusted-sub", "email": entriesActor.Email, "email_verified": "true", "token_use": "id"}
 
 // entriesCall issues GET /entries?query as the authenticated actor.
-func entriesCall(t *testing.T, lister EntryLister, query string, claims map[string]string) (events.APIGatewayV2HTTPResponse, *logSink) {
+func entriesCall(t *testing.T, lister EntryService, query string, claims map[string]string) (events.APIGatewayV2HTTPResponse, *logSink) {
 	t.Helper()
 	sink := &logSink{}
 	deps := testDeps(sink)
@@ -68,7 +68,7 @@ func sampleEntry() domain.Entry {
 	}
 }
 
-func staticLister(p entries.Page, err error) EntryLister {
+func staticLister(p entries.Page, err error) EntryService {
 	return entryListerFunc(func(context.Context, domain.Actor, entries.ListRequest) (entries.Page, error) { return p, err })
 }
 
