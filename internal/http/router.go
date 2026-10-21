@@ -29,7 +29,7 @@ type RouterDeps struct {
 	// ActorResolver authenticates protected routes; health never calls it.
 	ActorResolver ActorResolver
 	// Entries serves the log-hours endpoints.
-	Entries EntryLister
+	Entries EntryService
 	// Clients is the saved-clients use case (S2-07).
 	Clients ClientService
 	// Categories is the category lookup use case (S2-08).

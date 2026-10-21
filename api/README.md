@@ -4,13 +4,13 @@
 
 ## Workflow for a contract change
 
-S2-03 defines the log-hours contract (categories, clients, entries) before S2-05 to S2-08
-implement it; S2-06, S2-07 and S2-08 have implemented `listEntries`, the client operations and `listCategories`. The generator excludes the operations that are not implemented yet from route generation
+S2-03 defined the log-hours contract (categories, clients, entries) before S2-05 to S2-08
+implemented it; all four are done (`listEntries`, the client operations, `listCategories` and the entry
+create, get, update and delete operations). When a contract is published before its handlers exist, the generator excludes the operations that are not implemented yet from route generation
 (`exclude-operation-ids` in `api/oapi-codegen.yaml`) while retaining their models, and the embedded
 server spec is filtered too; the full published contract remains `api/openapi.yaml`. When a ticket
 implements an operation, it removes that operation from the list, implements the strict handler and
-regenerates. There are no placeholder handlers behind this contract-only change. Only the entries
-create, get, update and delete operations (S2-05) are still excluded.
+regenerates. There are no placeholder handlers behind a contract-only change. The list is empty now.
 
 Request bodies are checked against the request schema before a handler runs
 (`internal/http/bodyschema.go`), so `additionalProperties: false`, `required`, types and lengths in

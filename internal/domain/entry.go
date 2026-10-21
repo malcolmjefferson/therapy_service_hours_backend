@@ -119,3 +119,34 @@ type Entry struct {
 func (e Entry) Hours() float64 {
 	return math.Round(float64(e.DurationMinutes)/60*100) / 100
 }
+
+// ConflictingEntry is the caller's own session that a new or edited session overlaps. It carries only
+// what the message needs to name the clash, so it can go back to its owner without the notes or clients.
+type ConflictingEntry struct {
+	ID          string
+	SessionDate time.Time
+	// StartTime and EndTime are local clock times as "HH:MM".
+	StartTime, EndTime string
+}
+
+// EntryOverlapError means the session overlaps another of the user's non-rejected sessions
+// (FR-LOG-04). It carries the clash so the form can say which session it is. It matches ErrConflict.
+type EntryOverlapError struct {
+	Conflicting ConflictingEntry
+}
+
+// Error reports the conflict without the session details, which are user data.
+func (e *EntryOverlapError) Error() string { return "entry overlaps another entry" }
+
+// Is makes the error match ErrConflict.
+func (e *EntryOverlapError) Is(target error) bool { return target == ErrConflict }
+
+// EntryLockedError means the entry is approved and cannot be edited or deleted until a supervisor
+// reverts the approval (CLAUDE.md §7.1). It matches ErrConflict.
+type EntryLockedError struct{}
+
+// Error says why the entry cannot change.
+func (e *EntryLockedError) Error() string { return "entry is approved and locked" }
+
+// Is makes the error match ErrConflict.
+func (e *EntryLockedError) Is(target error) bool { return target == ErrConflict }

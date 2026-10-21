@@ -21,6 +21,8 @@ const (
 	ProblemValidation       ProblemType = "urn:therapy-service-hours:problem:validation"
 	ProblemClientNameTaken  ProblemType = "urn:therapy-service-hours:problem:client-name-taken"
 	ProblemClientInUse      ProblemType = "urn:therapy-service-hours:problem:client-in-use"
+	ProblemEntryOverlap     ProblemType = "urn:therapy-service-hours:problem:entry-overlap"
+	ProblemEntryLocked      ProblemType = "urn:therapy-service-hours:problem:entry-locked"
 )
 
 // Problem is an RFC 7807 problem details body.

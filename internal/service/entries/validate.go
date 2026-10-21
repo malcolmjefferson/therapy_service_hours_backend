@@ -2,7 +2,7 @@
 // fields of a create or update request into values that are safe to store, and calculates the
 // duration. It performs no I/O: the database repeats the time rules as constraints (ARC-21), and
 // the checks that need storage (the category exists, the clients belong to the caller, no overlap)
-// belong to the endpoints (S2-05).
+// belong to the store behind the endpoints (S2-05).
 package entries
 
 import (

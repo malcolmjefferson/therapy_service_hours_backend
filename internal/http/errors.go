@@ -15,6 +15,8 @@ func problemFor(err error) Problem {
 	var verr *domain.ValidationError
 	var nameTaken *domain.ClientNameTakenError
 	var inUse *domain.ClientInUseError
+	var overlap *domain.EntryOverlapError
+	var locked *domain.EntryLockedError
 	var maxErr *http.MaxBytesError
 	switch {
 	case errors.Is(err, authn.ErrUnauthorized):
@@ -34,6 +36,12 @@ func problemFor(err error) Problem {
 	case errors.As(err, &inUse):
 		return Problem{Type: ProblemClientInUse, Title: "Client is used by entries", Status: http.StatusConflict,
 			Extensions: map[string]any{"entry_count": inUse.EntryCount}}
+	case errors.As(err, &overlap):
+		// The clashing session is the caller's own, so naming it leaks nothing.
+		return Problem{Type: ProblemEntryOverlap, Title: "Session overlaps another entry", Status: http.StatusConflict,
+			Extensions: map[string]any{"conflicting_entry": conflictingEntryDTO(overlap.Conflicting)}}
+	case errors.As(err, &locked):
+		return Problem{Type: ProblemEntryLocked, Title: "Entry is approved and locked", Status: http.StatusConflict}
 	case errors.Is(err, domain.ErrNotFound):
 		return Problem{Type: ProblemNotFound, Title: "Not Found", Status: http.StatusNotFound}
 	case errors.Is(err, domain.ErrForbidden):
