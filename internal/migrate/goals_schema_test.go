@@ -1,12 +1,13 @@
 package migrate_test
 
 import (
+	"context"
 	"io/fs"
 	"testing"
 	"testing/fstest"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/db/migrations"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/db"
@@ -32,7 +33,12 @@ var wantDefaults = map[string]goalRow{
 	"on_site":        {target: nil},
 }
 
-func goalsOf(t *testing.T, pool *pgxpool.Pool, userID string) map[string]goalRow {
+// rowsQuerier is satisfied by the pool and by a single connection.
+type rowsQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+func goalsOf(t *testing.T, pool rowsQuerier, userID string) map[string]goalRow {
 	t.Helper()
 	rows, err := pool.Query(t.Context(), `SELECT goal_type, target_hours, last_celebrated_percent FROM goals WHERE user_id = $1`, userID)
 	if err != nil {
@@ -54,7 +60,7 @@ func goalsOf(t *testing.T, pool *pgxpool.Pool, userID string) map[string]goalRow
 	return got
 }
 
-func wantGoals(t *testing.T, pool *pgxpool.Pool, userID string, want map[string]goalRow) {
+func wantGoals(t *testing.T, pool rowsQuerier, userID string, want map[string]goalRow) {
 	t.Helper()
 	got := goalsOf(t, pool, userID)
 	if len(got) != len(want) {
@@ -133,17 +139,16 @@ func TestGoalsSchema_SeedAndFirstSignInProvisioningGetTheDefaults(t *testing.T) 
 	wantGoals(t, pool, actor.ID, want)
 }
 
-func TestGoalsSchema_BackfillsUsersThatExistBeforeTheMigration(t *testing.T) {
-	database := server.NewDatabase(t)
-	conn := open(t, database)
-
+// migrationsBefore is the embedded migrations without version 5, the state of a database before S3-01.
+func migrationsBefore(t *testing.T) fstest.MapFS {
+	t.Helper()
 	before := fstest.MapFS{}
 	entries, err := fs.ReadDir(migrations.FS, ".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if e.Name() >= "00005" || e.IsDir() {
+		if e.IsDir() || e.Name() >= "00005" {
 			continue
 		}
 		data, err := fs.ReadFile(migrations.FS, e.Name())
@@ -152,46 +157,35 @@ func TestGoalsSchema_BackfillsUsersThatExistBeforeTheMigration(t *testing.T) {
 		}
 		before[e.Name()] = &fstest.MapFile{Data: data}
 	}
-	if res := migrate.Run(t.Context(), conn, before, migrate.Options{LockID: 917_005}); res.Status != migrate.StatusOK || res.Version != 4 {
+	return before
+}
+
+func TestGoalsSchema_BackfillsUsersThatExistBeforeTheMigration(t *testing.T) {
+	database := server.NewDatabase(t)
+	conn := open(t, database)
+	opts := migrate.Options{LockID: 917_005}
+
+	if res := migrate.Run(t.Context(), conn, migrationsBefore(t), opts); res.Status != migrate.StatusOK || res.Version != 4 {
 		t.Fatalf("migrate to 4 = %+v", res)
 	}
-
 	check := server.Connect(t, database)
-	var admin, member string
-	if err := check.QueryRow(t.Context(), `INSERT INTO users (organization_id, email) SELECT id, 'older-admin@example.test' FROM organizations RETURNING id::text`).Scan(&admin); err != nil {
-		t.Fatal(err)
-	}
-	if err := check.QueryRow(t.Context(), `INSERT INTO users (organization_id, email, cognito_sub) SELECT id, 'older-member@example.test', 'older-sub' FROM organizations RETURNING id::text`).Scan(&member); err != nil {
-		t.Fatal(err)
-	}
-
-	if res := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{LockID: 917_005}); res.Status != migrate.StatusOK || len(res.Applied) != 1 || res.Version != 5 {
-		t.Fatalf("migrate to 5 = %+v", res)
-	}
-	pool := server.Connect(t, database)
-	for _, id := range []string{admin, member} {
-		rows, err := pool.Query(t.Context(), `SELECT goal_type, target_hours, last_celebrated_percent FROM goals WHERE user_id = $1`, id)
+	var users []string
+	for _, row := range []struct{ email, sub string }{{"older-admin@example.test", ""}, {"older-member@example.test", "older-sub"}} {
+		var id string
+		err := check.QueryRow(t.Context(),
+			`INSERT INTO users (organization_id, email, cognito_sub) SELECT id, $1, NULLIF($2, '') FROM organizations RETURNING id::text`,
+			row.email, row.sub).Scan(&id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		n := 0
-		for rows.Next() {
-			var typ string
-			var target *int32
-			var celebrated int16
-			if err := rows.Scan(&typ, &target, &celebrated); err != nil {
-				t.Fatal(err)
-			}
-			w := wantDefaults[typ]
-			if (target == nil) != (w.target == nil) || (target != nil && int(*target) != *w.target) || celebrated != 0 {
-				t.Errorf("backfilled %s = %v/%d, want %+v", typ, target, celebrated, w)
-			}
-			n++
-		}
-		rows.Close()
-		if n != 4 {
-			t.Errorf("user %s has %d goals after the migration, want 4", id, n)
-		}
+		users = append(users, id)
+	}
+
+	if res := migrate.Run(t.Context(), conn, migrations.FS, opts); res.Status != migrate.StatusOK || len(res.Applied) != 1 || res.Version != 5 {
+		t.Fatalf("migrate to 5 = %+v", res)
+	}
+	for _, id := range users {
+		wantGoals(t, check, id, wantDefaults)
 	}
 }
 
