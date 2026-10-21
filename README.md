@@ -240,6 +240,34 @@ Layers: handler `internal/http/entries.go` (translate only), service `internal/s
 running: `go test -race ./internal/service/entries ./internal/http`. The PostgreSQL tests drive the real router,
 service and store end to end.
 
+## Idempotency-Key (S2-09)
+
+`POST /entries` and `POST /clients` require an `Idempotency-Key` header (a UUID, one per user action,
+reused on retry). The middleware `internal/http/idempotency.go` covers every `POST` whose contract
+declares the header, so a new create endpoint gets the behavior by declaring the parameter.
+
+| Request | Result |
+|---|---|
+| New key | The handler runs. A `2xx` response is stored under the key and the caller. |
+| Same key, same method, path and body | The stored response is replayed with `Idempotency-Replayed: true`; nothing is created again. The body is compared as canonical JSON, so member order and whitespace do not matter. |
+| Same key, different body or endpoint | `409` `idempotency-key-reused`. |
+| Same key while the first request still runs | `409` `idempotency-key-in-progress` with `Retry-After: 1`. |
+| Same key after a failed request | The claim was released, so the request runs again. Errors are not stored: they changed nothing, and a user who fixes the cause retries with the same key. |
+
+Records live in the `idempotency_keys` table (migration `00004`), keyed by user and key, in the same
+PostgreSQL database (no extra service). A key is remembered for 24 hours (`idempotency.KeyTTL`). A claim
+that never completes, because its Lambda timed out, blocks the key for 60 seconds
+(`idempotency.ClaimLease`) and is then taken over. If the store is unavailable the create does not run
+(fail closed). If the response cannot be stored after a successful create, the client still gets its
+`201`, an error is logged, and a retry falls back to the entry's own overlap rule (`409 entry-overlap`).
+
+**Cleanup.** `cmd/idempotency-purge` deletes expired records in batches of 500 and logs only the count.
+It connects as `app_rw` over IAM like the other VPC Lambdas. It needs a schedule (daily is enough) and the
+same VPC, subnet, security group and `DB_*` settings as `cmd/seed`; those live in the infra repo.
+
+Verify with `go test -race ./internal/http ./internal/service/entries ./cmd/idempotency-purge` (the
+PostgreSQL tests need Docker).
+
 ## Identity seed Lambda (S1-09)
 
 `cmd/seed` is invoked through IAM, with no public HTTP route. It connects as `app_rw` using

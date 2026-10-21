@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/idempotency"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
 )
 
@@ -60,10 +61,25 @@ func testDeps(sink *logSink) RouterDeps {
 		Entries: entryListerFunc(func(context.Context, domain.Actor, entries.ListRequest) (entries.Page, error) {
 			return entries.Page{}, domain.ErrForbidden
 		}),
-		Clients:    &fakeClients{},
-		Categories: &fakeCategories{},
+		Clients:     &fakeClients{},
+		Categories:  &fakeCategories{},
+		Idempotency: passthroughIdempotency{},
 	}
 }
+
+// passthroughIdempotency claims every key, so tests that are not about replay can reuse one key.
+// idempotency_test.go uses a store with the real semantics.
+type passthroughIdempotency struct{}
+
+func (passthroughIdempotency) Claim(context.Context, string, string, []byte) (idempotency.Claim, error) {
+	return idempotency.Claim{Outcome: idempotency.Acquired}, nil
+}
+
+func (passthroughIdempotency) Complete(context.Context, string, string, []byte, idempotency.Response) error {
+	return nil
+}
+
+func (passthroughIdempotency) Release(context.Context, string, string, []byte) error { return nil }
 
 type entryListerFunc func(context.Context, domain.Actor, entries.ListRequest) (entries.Page, error)
 

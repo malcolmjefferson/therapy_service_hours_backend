@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/http/gen"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/idempotency"
 )
 
 // BasePath is the prefix of every API route (CLAUDE.md §10).
@@ -34,6 +35,8 @@ type RouterDeps struct {
 	Clients ClientService
 	// Categories is the category lookup use case (S2-08).
 	Categories CategoryService
+	// Idempotency stores Idempotency-Key claims and responses for the create operations (S2-09).
+	Idempotency idempotency.Store
 }
 
 func (d RouterDeps) validate() error {
@@ -65,6 +68,9 @@ func (d RouterDeps) validate() error {
 	if d.Categories == nil {
 		errs = append(errs, errors.New("categories service is required"))
 	}
+	if d.Idempotency == nil {
+		errs = append(errs, errors.New("idempotency store is required"))
+	}
 	return errors.Join(errs...)
 }
 
@@ -78,7 +84,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, fmt.Errorf("load embedded OpenAPI spec: %w", err)
 	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients, categories: deps.Categories}, deps.ActorResolver, spec)
+	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients, categories: deps.Categories}, deps.ActorResolver, deps.Idempotency, spec)
 	return r, nil
 }
 

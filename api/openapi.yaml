@@ -320,7 +320,7 @@ paths:
         A session that overlaps another of the caller's non-rejected sessions is **409**
         `urn:therapy-service-hours:problem:entry-overlap`, naming the clashing session in
         `conflicting_entry`. Repeating a request with the same `Idempotency-Key` and body returns
-        the original result.
+        the original result (see the `Idempotency-Key` parameter).
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -460,7 +460,15 @@ components:
     IdempotencyKey:
       name: Idempotency-Key
       in: header
-      description: Client-generated key, one per user action and reused on retry (GO-57, FE-34).
+      description: |
+        Client-generated key, one per user action and reused on retry (GO-57, FE-34). Keys are kept
+        for 24 hours and belong to the caller. Repeating a request with the same key and the same
+        body returns the original **successful** response, marked `Idempotency-Replayed: true`,
+        without creating anything again. The same key with a different body or endpoint is **409**
+        `urn:therapy-service-hours:problem:idempotency-key-reused`. If the first request is still
+        running, the answer is **409** `urn:therapy-service-hours:problem:idempotency-key-in-progress`
+        with `Retry-After`; repeat the same request. An error response is not stored, so a request
+        that failed can be sent again with the same key once its cause is fixed.
       required: true
       schema:
         type: string
@@ -529,6 +537,7 @@ components:
         `urn:therapy-service-hours:problem:entry-overlap` (the session overlaps another of the
         caller's non-rejected sessions; `conflicting_entry` names it) or
         `urn:therapy-service-hours:problem:entry-locked` (the entry is approved and cannot change).
+        On `POST /entries` it can also be an idempotency problem (see the `Idempotency-Key` parameter).
       content:
         application/problem+json:
           schema:
@@ -539,6 +548,7 @@ components:
         clients has that name, ignoring case; `existing_client` is that client) or
         `urn:therapy-service-hours:problem:client-in-use` (entries still use the client;
         `entry_count` says how many; repeat with `confirm_detach=true` to delete it anyway).
+        On `POST /clients` it can also be an idempotency problem (see the `Idempotency-Key` parameter).
       content:
         application/problem+json:
           schema:

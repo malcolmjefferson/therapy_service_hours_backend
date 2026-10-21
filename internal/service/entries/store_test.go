@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ type env struct {
 	pool   *pgxpool.Pool
 	router http.Handler
 	actor  domain.Actor // who the next request is made as
+	keys   atomic.Int64 // counter behind the fresh Idempotency-Key of each POST
 }
 
 func newEnv(t *testing.T) *env {
@@ -86,6 +88,7 @@ func newEnv(t *testing.T) *env {
 		Entries:       service,
 		Clients:       clientService,
 		Categories:    categoryService,
+		Idempotency:   db.NewIdempotencyStore(pool),
 	})
 	if err != nil {
 		t.Fatal(err)
