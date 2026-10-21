@@ -154,71 +154,26 @@ func TestInjectionPayloads_TextFieldsAreStoredAndMatchedLiterally(t *testing.T) 
 	bystanderClient := e.client(b, "Bystander")
 	e.actor = a
 
-	wantEntries, wantClients := 1, 1 // the bystander's
+	clientsMade := 0
 	for i, p := range injectionPayloads {
 		t.Run(fmt.Sprintf("payload %d", i), func(t *testing.T) {
-			// Notes: stored on create and replaced on update, byte for byte.
-			start := fmt.Sprintf("%02d:00", 6+i)
-			end := fmt.Sprintf("%02d:30", 6+i)
-			quoted := jsonString(t, p)
-			wantEntries++
-			created := e.created(e.body("2026-10-05", start, end, 1, `"notes":`+quoted))
-			if created["notes"] != p {
-				t.Errorf("created notes = %q, want %q", created["notes"], p)
-			}
-			id := created["id"].(string)
-			status, res := e.call(http.MethodPut, "/entries/"+id, e.body("2026-10-05", start, end, 2, `"notes":`+quoted))
-			if status != http.StatusOK {
-				t.Fatalf("PUT = %d: %s", status, res)
-			}
-			if got := decode[map[string]any](t, res)["notes"]; got != p {
-				t.Errorf("updated notes = %q, want %q", got, p)
-			}
-
-			// Client name: created and renamed through the API, stored as plain text. Names may not
-			// hold control characters, so the multi-line payload is a clean 400 here instead.
-			status, res = e.call(http.MethodPost, "/clients", `{"name":`+quoted+`}`)
-			if strings.ContainsAny(p, "\n\t") {
-				expectProblem(t, status, res, http.StatusBadRequest, "validation")
+			e.notesAreStoredLiterally(t, i, p)
+			clientID := e.clientNameIsStoredLiterally(t, p)
+			if clientID == "" {
 				return
 			}
-			wantClients++
-			if status != http.StatusCreated {
-				t.Fatalf("POST /clients = %d: %s", status, res)
-			}
-			client := decode[map[string]any](t, res)
-			if client["name"] != p {
-				t.Errorf("client name = %q, want %q", client["name"], p)
-			}
-			renamed := p + " (renamed)"
-			status, res = e.call(http.MethodPatch, "/clients/"+client["id"].(string), `{"name":`+jsonString(t, renamed)+`}`)
-			if status != http.StatusOK || decode[map[string]any](t, res)["name"] != renamed {
-				t.Errorf("PATCH /clients = %d: %s", status, res)
-			}
-
-			// The client filter treats the payload as text: it matches the client named with it and
-			// nothing else, so a quote never widens the match and a wildcard is not a wildcard.
-			if strings.TrimSpace(p) == p && len(p) <= 64 {
-				status, res = e.call(http.MethodPost, "/entries", e.body("2026-10-05", fmt.Sprintf("%02d:30", 6+i), fmt.Sprintf("%02d:45", 6+i), 1, clientIDs(client["id"].(string))))
-				if status != http.StatusCreated {
-					t.Fatalf("POST /entries with the client = %d: %s", status, res)
-				}
-				wantEntries++
-				withClient := decode[map[string]any](t, res)["id"].(string)
-				got := e.list(q("client", p))
-				if !containsID(got.ids(), withClient) {
-					t.Errorf("client=%q did not find the entry of the client with that name", p)
-				}
-				if containsID(got.ids(), bystander) {
-					t.Errorf("client=%q returned another user's entry", p)
-				}
-			}
+			clientsMade++
+			e.clientFilterMatchesLiterally(t, i, p, clientID, bystander)
 		})
 	}
 
+	// Each payload made one entry with notes, and each client made one more to find it by.
 	counts := e.rowCounts()
-	if counts["entries"] != wantEntries || counts["clients"] != wantClients {
-		t.Errorf("row counts after the payloads = %v", counts)
+	if want := 1 + len(injectionPayloads) + clientsMade; counts["entries"] != want {
+		t.Errorf("%d entries after the payloads, want %d (%v)", counts["entries"], want, counts)
+	}
+	if want := 1 + clientsMade; counts["clients"] != want {
+		t.Errorf("%d clients after the payloads, want %d (%v)", counts["clients"], want, counts)
 	}
 	var notes, name string
 	if err := e.conn.QueryRow(t.Context(), `SELECT notes FROM entries WHERE id = $1`, bystander).Scan(&notes); err != nil || notes != "untouched" {
@@ -226,6 +181,66 @@ func TestInjectionPayloads_TextFieldsAreStoredAndMatchedLiterally(t *testing.T) 
 	}
 	if err := e.conn.QueryRow(t.Context(), `SELECT name FROM clients WHERE id = $1`, bystanderClient).Scan(&name); err != nil || name != "Bystander" {
 		t.Errorf("another user's client changed: %q (%v)", name, err)
+	}
+}
+
+// notesAreStoredLiterally creates an entry with the payload as its notes, then replaces the notes
+// with it again through PUT; both responses must return it byte for byte.
+func (e *env) notesAreStoredLiterally(t *testing.T, i int, payload string) {
+	t.Helper()
+	start, end := fmt.Sprintf("%02d:00", 6+i), fmt.Sprintf("%02d:30", 6+i)
+	notes := `"notes":` + jsonString(t, payload)
+	created := e.created(e.body("2026-10-05", start, end, 1, notes))
+	if created["notes"] != payload {
+		t.Errorf("created notes = %q, want %q", created["notes"], payload)
+	}
+	status, res := e.call(http.MethodPut, "/entries/"+created["id"].(string), e.body("2026-10-05", start, end, 2, notes))
+	if status != http.StatusOK {
+		t.Fatalf("PUT = %d: %s", status, res)
+	}
+	if got := decode[map[string]any](t, res)["notes"]; got != payload {
+		t.Errorf("updated notes = %q, want %q", got, payload)
+	}
+}
+
+// clientNameIsStoredLiterally creates and renames a client using the payload and returns its id.
+// Names may not hold control characters, so for those the payload is a clean 400 and the id is "".
+func (e *env) clientNameIsStoredLiterally(t *testing.T, payload string) string {
+	t.Helper()
+	status, res := e.call(http.MethodPost, "/clients", `{"name":`+jsonString(t, payload)+`}`)
+	if strings.ContainsAny(payload, "\n\t") {
+		expectProblem(t, status, res, http.StatusBadRequest, "validation")
+		return ""
+	}
+	if status != http.StatusCreated {
+		t.Fatalf("POST /clients = %d: %s", status, res)
+	}
+	client := decode[map[string]any](t, res)
+	if client["name"] != payload {
+		t.Errorf("client name = %q, want %q", client["name"], payload)
+	}
+	id := client["id"].(string)
+	renamed := payload + " (renamed)"
+	status, res = e.call(http.MethodPatch, "/clients/"+id, `{"name":`+jsonString(t, renamed)+`}`)
+	if status != http.StatusOK || decode[map[string]any](t, res)["name"] != renamed {
+		t.Errorf("PATCH /clients = %d: %s", status, res)
+	}
+	return id
+}
+
+// clientFilterMatchesLiterally logs an entry for the client and filters by the payload: the filter
+// treats it as text, so it finds that entry and never another user's, a quote does not widen the
+// match and a wildcard is not a wildcard.
+func (e *env) clientFilterMatchesLiterally(t *testing.T, i int, payload, clientID, bystander string) {
+	t.Helper()
+	start, end := fmt.Sprintf("%02d:30", 6+i), fmt.Sprintf("%02d:45", 6+i)
+	withClient := e.created(e.body("2026-10-05", start, end, 1, clientIDs(clientID)))["id"].(string)
+	got := e.list(q("client", payload)).ids()
+	if !containsID(got, withClient) {
+		t.Errorf("client=%q did not find the entry of the client with that name", payload)
+	}
+	if containsID(got, bystander) {
+		t.Errorf("client=%q returned another user's entry", payload)
 	}
 }
 
