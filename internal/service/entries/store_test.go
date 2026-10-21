@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,6 +45,7 @@ type env struct {
 	pool   *pgxpool.Pool
 	router http.Handler
 	actor  domain.Actor // who the next request is made as
+	actors sync.Map     // subject -> domain.Actor, for requests made as another user at the same time
 	keys   atomic.Int64 // counter behind the fresh Idempotency-Key of each POST
 }
 
@@ -84,7 +86,7 @@ func newEnv(t *testing.T) *env {
 		MaxBodyBytes:  1 << 20,
 		NewRequestID:  func() string { return "request-id" },
 		Now:           time.Now,
-		ActorResolver: actorFunc(func(context.Context, map[string]string) (domain.Actor, error) { return e.actor, nil }),
+		ActorResolver: actorFunc(e.resolve),
 		Entries:       service,
 		Clients:       clientService,
 		Categories:    categoryService,
@@ -94,6 +96,14 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	return e
+}
+
+// resolve returns the actor registered for the request's subject (see callAs), else e.actor.
+func (e *env) resolve(_ context.Context, claims map[string]string) (domain.Actor, error) {
+	if a, ok := e.actors.Load(claims["sub"]); ok {
+		return a.(domain.Actor), nil
+	}
+	return e.actor, nil
 }
 
 // user inserts an active user in the seeded organization and returns the actor for it.
