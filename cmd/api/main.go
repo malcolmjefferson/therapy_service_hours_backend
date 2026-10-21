@@ -74,6 +74,7 @@ func run() error {
 		Entries:       entryService,
 		Clients:       clientService,
 		Categories:    categoryService,
+		Idempotency:   db.NewIdempotencyStore(store),
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.

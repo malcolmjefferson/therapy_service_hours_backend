@@ -19,14 +19,19 @@ import (
 // store against the real migrations (GO-17, GO-72). Users, clients and notes are fictional pseudonyms
 // (CLAUDE.md §0.7).
 
-const idempotencyKey = "00000000-0000-4000-8000-0000000000f1"
-
-// call sends one request as e.actor and returns the status and body.
+// call sends one request as e.actor and returns the status and body. Each POST carries a fresh
+// Idempotency-Key, as the client does for each user action; callWithKey repeats one.
 func (e *env) call(method, path, body string) (int, string) {
+	e.t.Helper()
+	return e.callWithKey(method, path, body, fmt.Sprintf("00000000-0000-4000-8000-%012d", e.keys.Add(1)))
+}
+
+// callWithKey is call with an explicit Idempotency-Key on POSTs.
+func (e *env) callWithKey(method, path, body, key string) (int, string) {
 	e.t.Helper()
 	event := events.APIGatewayV2HTTPRequest{RawPath: httpapi.BasePath + path, Body: body, Headers: map[string]string{"content-type": "application/json"}}
 	if method == http.MethodPost {
-		event.Headers["idempotency-key"] = idempotencyKey
+		event.Headers["idempotency-key"] = key
 	}
 	event.RequestContext.HTTP.Method = method
 	event.RequestContext.Authorizer = &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{JWT: &events.APIGatewayV2HTTPRequestContextAuthorizerJWTDescription{Claims: map[string]string{"sub": "s"}}}

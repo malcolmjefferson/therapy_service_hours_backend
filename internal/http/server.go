@@ -14,6 +14,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/authz"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/http/gen"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/idempotency"
 )
 
 // server implements the generated strict server interface, so every handler matches
@@ -34,7 +35,7 @@ func (s *server) GetHealth(_ context.Context, _ gen.GetHealthRequestObject) (gen
 }
 
 // mountAPI registers the generated routes under BasePath on r.
-func mountAPI(r chi.Router, s *server, resolver ActorResolver, spec *openapi3.T) {
+func mountAPI(r chi.Router, s *server, resolver ActorResolver, store idempotency.Store, spec *openapi3.T) {
 	strict := gen.NewStrictHandlerWithOptions(s, nil, gen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  badRequest,
 		ResponseErrorHandlerFunc: WriteError,
@@ -44,7 +45,7 @@ func mountAPI(r chi.Router, s *server, resolver ActorResolver, spec *openapi3.T)
 		BaseRouter:       r,
 		ErrorHandlerFunc: badRequest,
 		Middlewares: []gen.MiddlewareFunc{func(next http.Handler) http.Handler {
-			protected := RequireAuthorizerClaims(resolveActor(resolver)(validateBodies(spec)(next)))
+			protected := RequireAuthorizerClaims(resolveActor(resolver)(validateBodies(spec)(idempotent(spec, store)(next))))
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if req.Method == http.MethodGet && req.URL.Path == BasePath+"/healthz" {
 					next.ServeHTTP(w, req)

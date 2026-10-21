@@ -21,3 +21,12 @@ sql:
         out: internal/db/loghoursqueries
         sql_package: pgx/v5
         emit_empty_slices: true
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/idempotency
+    gen:
+      go:
+        package: idempotencyqueries
+        out: internal/db/idempotencyqueries
+        sql_package: pgx/v5
+        emit_empty_slices: true

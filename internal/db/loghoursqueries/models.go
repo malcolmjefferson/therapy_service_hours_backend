@@ -46,6 +46,19 @@ type EntryClient struct {
 	UserID   pgtype.UUID
 }
 
+type IdempotencyKey struct {
+	UserID              pgtype.UUID
+	Key                 pgtype.UUID
+	RequestHash         []byte
+	State               string
+	LockedUntil         pgtype.Timestamptz
+	ResponseStatus      pgtype.Int2
+	ResponseContentType pgtype.Text
+	ResponseBody        []byte
+	CreatedAt           pgtype.Timestamptz
+	ExpiresAt           pgtype.Timestamptz
+}
+
 type Invitation struct {
 	ID             pgtype.UUID
 	Email          string

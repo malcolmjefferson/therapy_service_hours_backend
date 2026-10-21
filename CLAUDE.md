@@ -370,7 +370,7 @@ Primary keys are UUIDs. All timestamps are `timestamptz` except session times (l
 
 ## 10. API
 
-Base path `/api/v1`. The bearer credential is the Cognito **ID token**, validated by the API Gateway JWT authorizer on every route except `GET /healthz`, which has its own unauthenticated route (ADR-0008). The authorizer's own rejection is `application/json {"message":"Unauthorized"}`, not `problem+json`: HTTP APIs cannot customise gateway responses, and clients must tolerate it. JSON. Errors use RFC 7807 `application/problem+json`. List endpoints are paginated (default 50). `Idempotency-Key` header supported on POSTs that create or bulk-change data. The OpenAPI file is the contract.
+Base path `/api/v1`. The bearer credential is the Cognito **ID token**, validated by the API Gateway JWT authorizer on every route except `GET /healthz`, which has its own unauthenticated route (ADR-0008). The authorizer's own rejection is `application/json {"message":"Unauthorized"}`, not `problem+json`: HTTP APIs cannot customise gateway responses, and clients must tolerate it. JSON. Errors use RFC 7807 `application/problem+json`. List endpoints are paginated (default 50). `Idempotency-Key` header required on POSTs that create or bulk-change data: the same key and body replays the original successful response, a different body is 409 (S2-09; see the backend README). The OpenAPI file is the contract.
 
 | Area | Endpoints (illustrative) | Roles |
 |---|---|---|
