@@ -4,3 +4,12 @@ title = "therapy_service_hours"
 
 [extend]
 useDefault = true
+
+# internal/http/gen/api.gen.go embeds the OpenAPI spec as base64 chunks (oapi-codegen). A chunk can
+# look like a high-entropy API key to the generic rule; it is not a secret. The file is generated
+# from api/openapi.yaml, which is scanned, and CI fails if it is stale (scripts/check-generated.sh).
+# Only the generic rule is skipped here; every other rule still scans the file.
+[[allowlists]]
+description = "Base64 of the embedded OpenAPI spec in generated code"
+targetRules = ["generic-api-key"]
+paths = ['''internal/http/gen/api\.gen\.go$''']
