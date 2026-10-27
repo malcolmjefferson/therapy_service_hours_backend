@@ -10,7 +10,8 @@ create, get, update and delete operations). When a contract is published before 
 (`exclude-operation-ids` in `api/oapi-codegen.yaml`) while retaining their models, and the embedded
 server spec is filtered too; the full published contract remains `api/openapi.yaml`. When a ticket
 implements an operation, it removes that operation from the list, implements the strict handler and
-regenerates. There are no placeholder handlers behind a contract-only change. The list is empty now.
+regenerates. There are no placeholder handlers behind a contract-only change. S4-01 published
+`importMarkdown` and `exportEntries`; S4-06 implemented `exportEntries`, so the list holds `importMarkdown` until S4-04 implements it.
 
 Request bodies are checked against the request schema before a handler runs
 (`internal/http/bodyschema.go`), so `additionalProperties: false`, `required`, types and lengths in
@@ -43,6 +44,7 @@ pipeline's drift gate checks the backend commit and pinned frontend copy byte fo
 | **Auth** | `cognitoJwt` is required globally. Only public operations declare `security: []` (today only `GET /healthz`). |
 | **Audiences** | Responses are explicit, per-audience schemas. Peer and supervisor schemas never reference the owner's entry schema (ARC-18, SEC-40). |
 | **Log-hours problems** | `409` `urn:therapy-service-hours:problem:entry-overlap` (with `conflicting_entry`), `entry-locked` (approved entry), `client-name-taken` (with `existing_client`) and `client-in-use` (with `entry_count`). Unknown request fields, including `hours`, are `400` `validation`. Another user's entry or client is `404`, never `403`. |
+| **Import and export** | `POST /import/markdown` takes one multipart `file` part (at most 1 MiB, at most 5,000 rows) and answers `200` with an `ImportReport`: `imported_count`, `needs_time_count`, `merged_clients` and `skipped_rows`, each with a `reason` and never the cell content. A bad row is skipped and reported, valid rows are kept, and the import is one transaction. Over-limit uploads are `413` `body-too-large` or `import-too-many-rows`; a file that is not a Markdown ledger is `400` `validation`. `GET /export/entries` pages through the caller's own entries oldest first (shared `page` and `page_size`, maximum 200) with times, clients and status; the client builds the Markdown, CSV or PDF file. |
 | **Compatibility** | Within v1, only add optional fields, new endpoints, or enum values the frontend handles. Anything `oasdiff` reports as breaking needs the `breaking-change` PR label, and both sides must ship in the same release (ARC-14). |
 
 ## Spectral ruleset (`.spectral.yaml`)

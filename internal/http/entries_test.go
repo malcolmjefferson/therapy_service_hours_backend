@@ -34,6 +34,12 @@ var entriesClaims = map[string]string{"sub": "trusted-sub", "email": entriesActo
 // entriesCall issues GET /entries?query as the authenticated actor.
 func entriesCall(t *testing.T, lister EntryService, query string, claims map[string]string) (events.APIGatewayV2HTTPResponse, *logSink) {
 	t.Helper()
+	return entriesCallAt(t, lister, "/entries", query, claims)
+}
+
+// entriesCallAt issues GET path?query as the authenticated actor.
+func entriesCallAt(t *testing.T, lister EntryService, path, query string, claims map[string]string) (events.APIGatewayV2HTTPResponse, *logSink) {
+	t.Helper()
 	sink := &logSink{}
 	deps := testDeps(sink)
 	deps.ActorResolver = resolverFunc(func(context.Context, map[string]string) (domain.Actor, error) { return entriesActor, nil })
@@ -43,7 +49,7 @@ func entriesCall(t *testing.T, lister EntryService, query string, claims map[str
 		t.Fatal(err)
 	}
 	event := meEvent(claims)
-	event.RawPath = BasePath + "/entries"
+	event.RawPath = BasePath + path
 	event.RawQueryString = query
 	response, err := apigw.Handler(h, ContextWithRequestID)(t.Context(), event)
 	if err != nil {

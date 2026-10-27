@@ -206,3 +206,13 @@ WHERE e.user_id = sqlc.arg(user_id)
         WHERE ec.entry_id = e.id AND ec.user_id = e.user_id
           AND cl.name ILIKE '%' || replace(replace(replace(sqlc.narg(client_text)::text, '\', '\\'), '%', '\%'), '_', '\_') || '%' ESCAPE '\'
   ));
+
+-- S4-06: the export read (FR-IO-04). The whole ledger of one user, oldest first, no filters.
+-- Entries without times (needs_time) come before timed entries of the same date, which is the order
+-- api/openapi.yaml promises for exportEntries. e.id is the unique tiebreaker, so pages are stable.
+-- name: ExportEntries :many
+SELECT e.*
+FROM entries e
+WHERE e.user_id = sqlc.arg(user_id)
+ORDER BY e.session_date ASC, e.start_time ASC NULLS FIRST, e.id ASC
+LIMIT sqlc.arg(page_size)::int OFFSET sqlc.arg(page_offset)::int;

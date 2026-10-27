@@ -1,0 +1,37 @@
+{
+  "Clients": null,
+  "ClientNotices": null,
+  "Rows": [
+    {
+      "Number": 1,
+      "Date": "2025-11-03T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "Pseudonym D"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": true,
+      "Notes": ""
+    },
+    {
+      "Number": 2,
+      "Date": "2025-11-04T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Intake Interviews",
+      "Clients": [
+        "Pseudonym E"
+      ],
+      "DurationMinutes": 90,
+      "OnSite": false,
+      "Notes": "first session"
+    }
+  ],
+  "Skipped": null,
+  "TotalRows": 2,
+  "HasTimeColumns": false
+}

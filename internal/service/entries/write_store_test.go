@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/apigw"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/domain"
 	httpapi "github.com/malcolmjefferson/therapy_service_hours_backend/internal/http"
 )
 
@@ -26,15 +27,32 @@ func (e *env) call(method, path, body string) (int, string) {
 	return e.callWithKey(method, path, body, fmt.Sprintf("00000000-0000-4000-8000-%012d", e.keys.Add(1)))
 }
 
+// defaultSubject is the authorizer subject of requests made as e.actor.
+const defaultSubject = "s"
+
 // callWithKey is call with an explicit Idempotency-Key on POSTs.
 func (e *env) callWithKey(method, path, body, key string) (int, string) {
 	e.t.Helper()
-	event := events.APIGatewayV2HTTPRequest{RawPath: httpapi.BasePath + path, Body: body, Headers: map[string]string{"content-type": "application/json"}}
+	return e.send(defaultSubject, method, path, body, key)
+}
+
+// callAs is call as another user, for requests made at the same time by several users.
+func (e *env) callAs(actor domain.Actor, method, path, body string) (int, string) {
+	e.t.Helper()
+	e.actors.Store(actor.ID, actor)
+	return e.send(actor.ID, method, path, body, fmt.Sprintf("00000000-0000-4000-8000-%012d", e.keys.Add(1)))
+}
+
+// send makes the request with the given authorizer subject; a path may carry a query string.
+func (e *env) send(subject, method, path, body, key string) (int, string) {
+	e.t.Helper()
+	path, query, _ := strings.Cut(path, "?")
+	event := events.APIGatewayV2HTTPRequest{RawPath: httpapi.BasePath + path, RawQueryString: query, Body: body, Headers: map[string]string{"content-type": "application/json"}}
 	if method == http.MethodPost {
 		event.Headers["idempotency-key"] = key
 	}
 	event.RequestContext.HTTP.Method = method
-	event.RequestContext.Authorizer = &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{JWT: &events.APIGatewayV2HTTPRequestContextAuthorizerJWTDescription{Claims: map[string]string{"sub": "s"}}}
+	event.RequestContext.Authorizer = &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{JWT: &events.APIGatewayV2HTTPRequestContextAuthorizerJWTDescription{Claims: map[string]string{"sub": subject}}}
 	res, err := apigw.Handler(e.router, httpapi.ContextWithRequestID)(e.t.Context(), event)
 	if err != nil {
 		e.t.Fatal(err)
