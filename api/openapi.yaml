@@ -34,6 +34,8 @@ tags:
     description: The current user's saved clients and groups (pseudonyms or initials only)
   - name: entries
     description: The current user's own hours entries
+  - name: import-export
+    description: Import of the prototype's Markdown ledger and export of the current user's entries
 paths:
   /me:
     get:
@@ -423,6 +425,110 @@ paths:
           $ref: '#/components/responses/EntryConflict'
         default:
           $ref: '#/components/responses/Problem'
+  /import/markdown:
+    post:
+      operationId: importMarkdown
+      tags: [import-export]
+      summary: Import a Markdown ledger into the caller's own entries
+      description: |
+        Imports the prototype's `.md` ledger (CLAUDE.md section 12.3) as the caller's own data. Both
+        layouts are accepted: with and without `Start` and `End` columns. A row without times is
+        imported as `needs_time` with its hours kept (FR-IO-02). Client names from the
+        `Clients / Groups` section and from the rows are merged into the caller's saved clients,
+        ignoring case (FR-IO-03). The file is parsed to typed values first; no cell is ever
+        interpreted as SQL, a formula or markup.
+
+        **Limits:** the file is at most 1 MiB (1,048,576 bytes) and the entries table has at most
+        5,000 rows. A larger file is **413** `urn:therapy-service-hours:problem:body-too-large`; more
+        rows is **413** `urn:therapy-service-hours:problem:import-too-many-rows`. Both are refused
+        before anything is stored. A file that is not a Markdown ledger (wrong content type, not
+        UTF-8 text, or no entries table) is **400** `urn:therapy-service-hours:problem:validation`.
+
+        **Row policy:** the import is one transaction. A bad row does not fail the import: valid
+        rows are kept and each row that was not imported is listed in `skipped_rows` with a reason
+        (ASM-07). Re-importing the same file imports nothing and reports every row as a
+        `duplicate`. The 200 response is the report; it is also what an idempotent retry returns.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportMarkdownRequest'
+            encoding:
+              file:
+                contentType: text/markdown, text/plain
+      responses:
+        '200':
+          description: The import ran. The report says what was imported and what was skipped.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReport'
+              example:
+                total_rows: 4
+                imported_count: 2
+                needs_time_count: 1
+                merged_clients:
+                  - client: { id: '00000000-0000-4000-8000-0000000000d1', name: Pseudonym A }
+                    created: true
+                  - client: { id: '00000000-0000-4000-8000-0000000000d2', name: Pseudonym B }
+                    created: false
+                skipped_count: 2
+                skipped_rows:
+                  - row: 3
+                    reason: duplicate
+                    message: Same date, category, hours, notes and clients as an existing entry.
+                  - row: 4
+                    reason: unknown-category
+                    field: category
+                    message: The category is not one of the service categories.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        default:
+          $ref: '#/components/responses/Problem'
+  /export/entries:
+    get:
+      operationId: exportEntries
+      tags: [import-export]
+      summary: Page through all of the caller's own entries for export
+      description: |
+        Everything a Markdown, CSV or PDF export needs, for the caller's entries only (FR-IO-04):
+        date, `start_time` and `end_time` (absent on a `needs_time` entry), hours, category with its
+        group, clients, on-site flag, notes and status. The client builds the file, so the export
+        works the same way for every format and the PDF needs no second call (FR-IO-06).
+
+        There are no filters: an export is the whole ledger. The order is oldest first
+        (`session_date`, then start time, then `id`) and does not change between pages. Entries
+        without times come before timed entries of the same date. The page size is capped at 200,
+        so a client reads `page` 1 up to `ceil(total_items / page_size)`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of the caller's entries, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     cognitoJwt:
@@ -553,6 +659,24 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ClientConflictProblem'
+    Conflict:
+      description: |
+        The request cannot be completed in the current state. `type` is an idempotency problem (see
+        the `Idempotency-Key` parameter): `urn:therapy-service-hours:problem:idempotency-key-reused`
+        or `urn:therapy-service-hours:problem:idempotency-key-in-progress`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: |
+        The upload is over a limit. `type` is `urn:therapy-service-hours:problem:body-too-large`
+        (the file is over 1 MiB) or `urn:therapy-service-hours:problem:import-too-many-rows` (the
+        entries table has more than 5,000 rows). Nothing was stored.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Problem:
       description: An error, as RFC 7807 problem details.
       content:
@@ -852,6 +976,110 @@ components:
               type: integer
               format: int32
               minimum: 1
+    ImportMarkdownRequest:
+      type: object
+      description: The upload. Unknown parts are rejected.
+      additionalProperties: false
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          maxLength: 1048576
+          description: The Markdown ledger, UTF-8 text, at most 1 MiB. Either layout is accepted.
+    ImportReport:
+      type: object
+      description: |
+        What an import did. Counts and lists contain no cell content other than client names,
+        which are pseudonyms or initials only (CLAUDE.md section 0.7).
+      additionalProperties: false
+      required: [total_rows, imported_count, needs_time_count, merged_clients, skipped_count, skipped_rows]
+      properties:
+        total_rows:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5000
+          description: Rows found in the entries table; `imported_count + skipped_count`.
+        imported_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5000
+          description: Entries created.
+        needs_time_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5000
+          description: Of the imported entries, how many have no times and are flagged `needs_time`.
+        merged_clients:
+          type: array
+          maxItems: 5000
+          description: |
+            Each distinct client name found in the file (the `Clients / Groups` section and the rows,
+            ignoring case) and what happened to it. Ordered by name, then `id`.
+          items:
+            $ref: '#/components/schemas/MergedClient'
+        skipped_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5000
+        skipped_rows:
+          type: array
+          maxItems: 5000
+          description: Rows that were not imported, in file order, each with the reason.
+          items:
+            $ref: '#/components/schemas/SkippedRow'
+    MergedClient:
+      type: object
+      additionalProperties: false
+      required: [client, created]
+      properties:
+        client:
+          $ref: '#/components/schemas/Client'
+        created:
+          type: boolean
+          description: True when the import saved a new client; false when a saved client already had that name.
+    SkippedRow:
+      type: object
+      additionalProperties: false
+      required: [row, reason, message]
+      properties:
+        row:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 5000
+          description: 1-based position in the entries table, not counting the header rows.
+        reason:
+          $ref: '#/components/schemas/SkipReason'
+        field:
+          type: string
+          maxLength: 100
+          description: The column that caused the skip, when one did. Absent for `duplicate`, `overlap` and `malformed-row`.
+        message:
+          type: string
+          maxLength: 500
+          description: Human-readable explanation. It never quotes the cell.
+    SkipReason:
+      type: string
+      description: |
+        Why a row was not imported. `duplicate`: an existing entry has the same date, category,
+        hours, notes and client set (ASM-07). `overlap`: the row has times that overlap another of
+        the caller's non-rejected sessions. `malformed-row`: the row does not have the columns of
+        the table. The others name the column whose value is invalid.
+      enum:
+        - duplicate
+        - overlap
+        - malformed-row
+        - invalid-date
+        - invalid-time
+        - invalid-hours
+        - unknown-category
+        - invalid-client
+        - invalid-notes
     GatewayUnauthorized:
       type: object
       required: [message]
