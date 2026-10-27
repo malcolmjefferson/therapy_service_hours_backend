@@ -19,6 +19,8 @@ type fakeStore struct {
 	calls          int
 	userID         string
 	query          entries.ListQuery
+	exportUserID   string
+	exportQuery    entries.ExportQuery
 	items          []domain.Entry
 	total          int64
 	err            error
@@ -27,6 +29,12 @@ type fakeStore struct {
 func (f *fakeStore) ListEntries(_ context.Context, userID string, q entries.ListQuery) ([]domain.Entry, int64, error) {
 	f.calls++
 	f.userID, f.query = userID, q
+	return f.items, f.total, f.err
+}
+
+func (f *fakeStore) ExportEntries(_ context.Context, userID string, q entries.ExportQuery) ([]domain.Entry, int64, error) {
+	f.calls++
+	f.exportUserID, f.exportQuery = userID, q
 	return f.items, f.total, f.err
 }
 
