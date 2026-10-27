@@ -43,6 +43,19 @@ jobs:
           go-version-file: go.mod
       - name: Verify modules (SEC-70)
         run: go mod verify
+      # Each test package starts its own container, so the packages pull the image at the same time and
+      # the registry throttles some of them (toomanyrequests). Pulling once first, with a retry, leaves
+      # the image in the local cache for every package.
+      - name: Pull the PostgreSQL test image once
+        run: |
+          image="$(sed -n 's/^const Image = "\(.*\)"$/\1/p' internal/testpg/testpg.go)"
+          test -n "$image"
+          for attempt in 1 2 3 4 5; do
+            docker pull "$image" && exit 0
+            echo "pull attempt $attempt failed; retrying" >&2
+            sleep $((attempt * 15))
+          done
+          exit 1
       - name: Tests (GO-42, GO-72)
         run: go test -race -count=1 ./...
       - name: Dev binding operator guards and privacy
