@@ -61,6 +61,12 @@ type Store interface {
 	// order and window q describes, together with the total number of entries matching the filters.
 	// It never returns another user's entries. A page past the end is empty, not an error.
 	ListEntries(ctx context.Context, userID string, q ListQuery) ([]domain.Entry, int64, error)
+
+	// ExportEntries returns one page of everything userID has logged, with category and clients,
+	// oldest first (session date, then start time with untimed entries first, then id), together with
+	// the total number of entries. It never returns another user's entries. A page past the end is
+	// empty, not an error.
+	ExportEntries(ctx context.Context, userID string, q ExportQuery) ([]domain.Entry, int64, error)
 }
 
 // Service implements the entry use cases.

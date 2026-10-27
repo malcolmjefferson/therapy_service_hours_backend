@@ -6,8 +6,8 @@ import (
 )
 
 // TestImportExportContract_Operations pins the S4-01 shape the frontend (S4-10 and the exporters)
-// builds against. The operations are excluded from route generation until S4-04 and S4-06 implement
-// them, so these checks read api/openapi.yaml itself.
+// builds against. importMarkdown is excluded from route generation until S4-04 implements it, so
+// these checks read api/openapi.yaml itself.
 func TestImportExportContract_Operations(t *testing.T) {
 	t.Parallel()
 	spec := loadFullSpec(t)

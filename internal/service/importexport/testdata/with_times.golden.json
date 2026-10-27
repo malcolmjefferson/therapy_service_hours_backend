@@ -1,0 +1,67 @@
+{
+  "Clients": [
+    "Pseudonym A",
+    "Pseudonym B"
+  ],
+  "ClientNotices": null,
+  "Rows": [
+    {
+      "Number": 1,
+      "Date": "2026-02-02T00:00:00Z",
+      "StartTime": "09:00",
+      "EndTime": "10:30",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "Pseudonym A"
+      ],
+      "DurationMinutes": 90,
+      "OnSite": true,
+      "Notes": "Weekly session"
+    },
+    {
+      "Number": 2,
+      "Date": "2026-02-02T00:00:00Z",
+      "StartTime": "10:45",
+      "EndTime": "11:30",
+      "Group": "direct",
+      "Category": "Case Management",
+      "Clients": [
+        "Pseudonym A",
+        "Pseudonym B"
+      ],
+      "DurationMinutes": 45,
+      "OnSite": false,
+      "Notes": "Calls | referrals"
+    },
+    {
+      "Number": 3,
+      "Date": "2026-02-03T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "indirect",
+      "Category": "Staff Meetings",
+      "Clients": null,
+      "DurationMinutes": 30,
+      "OnSite": true,
+      "Notes": "Imported without times"
+    },
+    {
+      "Number": 4,
+      "Date": "2026-02-04T00:00:00Z",
+      "StartTime": "13:00",
+      "EndTime": "14:00",
+      "Group": "supervision",
+      "Category": "Group Supervision",
+      "Clients": [
+        "Pseudonym B"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": false,
+      "Notes": ""
+    }
+  ],
+  "Skipped": null,
+  "TotalRows": 4,
+  "HasTimeColumns": true
+}

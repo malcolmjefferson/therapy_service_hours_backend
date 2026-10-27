@@ -1,0 +1,82 @@
+{
+  "Clients": [
+    "Pseudonym A",
+    "Pseudonym B",
+    "Tuesday Group"
+  ],
+  "ClientNotices": null,
+  "Rows": [
+    {
+      "Number": 1,
+      "Date": "2026-01-05T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "Pseudonym A"
+      ],
+      "DurationMinutes": 90,
+      "OnSite": true,
+      "Notes": "Intake follow-up"
+    },
+    {
+      "Number": 2,
+      "Date": "2026-01-06T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Group Facilitation",
+      "Clients": [
+        "Tuesday Group",
+        "Pseudonym B"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": false,
+      "Notes": "Coping skills | week 2"
+    },
+    {
+      "Number": 3,
+      "Date": "2026-01-06T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "indirect",
+      "Category": "Writing Progress Notes / Documentation",
+      "Clients": null,
+      "DurationMinutes": 15,
+      "OnSite": false,
+      "Notes": ""
+    },
+    {
+      "Number": 4,
+      "Date": "2026-01-07T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "supervision",
+      "Category": "Individual Supervision",
+      "Clients": [
+        "Pseudonym C"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": true,
+      "Notes": "Café → résumé review 😀"
+    },
+    {
+      "Number": 5,
+      "Date": "2026-01-08T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Couples / Family Therapy",
+      "Clients": [
+        "pseudonym a"
+      ],
+      "DurationMinutes": 75,
+      "OnSite": false,
+      "Notes": "Same name twice, different case"
+    }
+  ],
+  "Skipped": null,
+  "TotalRows": 5,
+  "HasTimeColumns": false
+}
