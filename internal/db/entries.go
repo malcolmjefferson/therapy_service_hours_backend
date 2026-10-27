@@ -70,30 +70,75 @@ func (s *EntryStore) ListEntries(ctx context.Context, userID string, q entries.L
 	if err != nil {
 		return nil, 0, fmt.Errorf("count entries: %w", err)
 	}
+	out, err := hydrate(ctx, queries, owner, rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
+}
+
+// ExportEntries reads one page of everything userID has logged, oldest first, with the total, in one
+// read-only snapshot like ListEntries. Entries without times come before timed ones on the same date.
+// The SQL is scoped to userID; there are no filters (FR-IO-04).
+func (s *EntryStore) ExportEntries(ctx context.Context, userID string, q entries.ExportQuery) ([]domain.Entry, int64, error) {
+	var owner pgtype.UUID
+	if err := owner.Scan(userID); err != nil {
+		return nil, 0, fmt.Errorf("parse user ID: %w", err)
+	}
+	tx, err := s.database.Begin(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("begin entries export: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	// Must be the first statement of the transaction.
+	if _, err := tx.Exec(ctx, "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"); err != nil {
+		return nil, 0, fmt.Errorf("set snapshot: %w", err)
+	}
+	queries := lq.New(tx)
+
+	rows, err := queries.ExportEntries(ctx, lq.ExportEntriesParams{
+		UserID: owner, PageOffset: int32(q.Offset()), PageSize: int32(q.PageSize), //nolint:gosec // G115: Page and PageSize are bounded by the service (1..100000 and 1..200).
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("export entries: %w", err)
+	}
+	total, err := queries.CountEntries(ctx, lq.CountEntriesParams{UserID: owner})
+	if err != nil {
+		return nil, 0, fmt.Errorf("count entries: %w", err)
+	}
+	out, err := hydrate(ctx, queries, owner, rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
+}
+
+// hydrate adds each row's category and clients, so a page costs three queries however many rows it holds.
+func hydrate(ctx context.Context, queries *lq.Queries, owner pgtype.UUID, rows []lq.Entry) ([]domain.Entry, error) {
 	if len(rows) == 0 {
-		return []domain.Entry{}, total, nil
+		return []domain.Entry{}, nil
 	}
 	categories, err := categoriesByID(ctx, queries)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	clients, err := clientsByEntry(ctx, queries, owner, rows)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	out := make([]domain.Entry, 0, len(rows))
 	for _, row := range rows {
 		category, ok := categories[row.CategoryID]
 		if !ok {
-			return nil, 0, errors.New("entry has an unknown category")
+			return nil, errors.New("entry has an unknown category")
 		}
 		entry, err := entryFromRow(row, category, clients[row.ID])
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		out = append(out, entry)
 	}
-	return out, total, nil
+	return out, nil
 }
 
 func listParams(owner pgtype.UUID, q entries.ListQuery) lq.ListEntriesParams {

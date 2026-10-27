@@ -104,6 +104,10 @@ func (entryListerFunc) Delete(context.Context, domain.Actor, string) error {
 	return domain.ErrForbidden
 }
 
+func (entryListerFunc) Export(context.Context, domain.Actor, entries.ExportRequest) (entries.Page, error) {
+	return entries.Page{}, domain.ErrForbidden
+}
+
 type resolverFunc func(context.Context, map[string]string) (domain.Actor, error)
 
 func (f resolverFunc) Resolve(ctx context.Context, claims map[string]string) (domain.Actor, error) {

@@ -11,7 +11,7 @@ create, get, update and delete operations). When a contract is published before 
 server spec is filtered too; the full published contract remains `api/openapi.yaml`. When a ticket
 implements an operation, it removes that operation from the list, implements the strict handler and
 regenerates. There are no placeholder handlers behind a contract-only change. S4-01 published
-`importMarkdown` and `exportEntries`, so the list holds those two until S4-04 and S4-06 implement them.
+`importMarkdown` and `exportEntries`; S4-06 implemented `exportEntries`, so the list holds `importMarkdown` until S4-04 implements it.
 
 Request bodies are checked against the request schema before a handler runs
 (`internal/http/bodyschema.go`), so `additionalProperties: false`, `required`, types and lengths in
