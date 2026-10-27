@@ -10,5 +10,7 @@ output-options:
   skip-prune: true
   # A contract published before its handlers exist lists the operations that are not implemented yet
   # here, so the models are generated but no route is. Each ticket removes its operations from the
-  # list. Every operation is implemented now (S2-05 was the last), so the list is empty.
-  exclude-operation-ids: []
+  # list. S4-01 published the import and export operations; S4-04 and S4-06 implement them.
+  exclude-operation-ids:
+    - importMarkdown
+    - exportEntries
