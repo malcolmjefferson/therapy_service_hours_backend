@@ -88,10 +88,13 @@ func TestAdminAuditLog_RowsSurviveDeletionOfTargetAndActor(t *testing.T) {
 	}
 }
 
+// newestFirstPage is the query S5-12 pages with: newest first, id breaking ties.
+const newestFirstPage = `SELECT id::text, created_at FROM admin_audit_log ORDER BY created_at DESC, id DESC LIMIT 50`
+
 func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 	pool := seedPool(t)
 	admin := insertUser(t, pool, "paging-admin@example.test")
-	// Two rows share a timestamp, so the order depends on the id tie-break.
+	// Two rows share each timestamp, so the order depends on the id tie-break.
 	if _, err := pool.Exec(t.Context(), `
 		INSERT INTO admin_audit_log (actor_id, actor_name, action, created_at)
 		SELECT $1::uuid, 'Ada Admin', 'org.create', timestamptz '2026-10-01 09:00:00+00' + (n / 2) * interval '1 minute'
@@ -99,8 +102,7 @@ func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const page = `SELECT id::text, created_at FROM admin_audit_log ORDER BY created_at DESC, id DESC LIMIT 50`
-	rows, err := pool.Query(t.Context(), page)
+	rows, err := pool.Query(t.Context(), newestFirstPage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,7 @@ func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 	var prevAt time.Time
 	var prevID string
 	n := 0
-	for rows.Next() {
+	for ; rows.Next(); n++ {
 		var id string
 		var at time.Time
 		if err := rows.Scan(&id, &at); err != nil {
@@ -118,7 +120,6 @@ func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 			t.Fatalf("row %d (%s, %s) is not before (%s, %s)", n, at, id, prevAt, prevID)
 		}
 		prevAt, prevID = at, id
-		n++
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
@@ -127,7 +128,15 @@ func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 		t.Fatalf("page rows = %d, want 50", n)
 	}
 
-	// With the sequential scan off the planner has no choice but to show whether the index can serve the sort.
+	if plan := explainWithoutSeqScan(t, pool, newestFirstPage); !strings.Contains(plan, "admin_audit_log_created_at_idx") {
+		t.Errorf("newest-first page does not use admin_audit_log_created_at_idx:\n%s", plan)
+	}
+}
+
+// explainWithoutSeqScan returns the plan for query with sequential scans and sorts off, so the plan
+// shows whether an index can serve the query on its own.
+func explainWithoutSeqScan(t *testing.T, pool *pgxpool.Pool, query string) string {
+	t.Helper()
 	tx, err := pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +147,7 @@ func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	plan, err := tx.Query(t.Context(), `EXPLAIN `+page) // nosemgrep: no-string-built-sql
+	plan, err := tx.Query(t.Context(), `EXPLAIN `+query) // nosemgrep: no-string-built-sql
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,9 +160,7 @@ func TestAdminAuditLog_NewestFirstPagingUsesTheIndex(t *testing.T) {
 		}
 		lines = append(lines, line)
 	}
-	if text := strings.Join(lines, "\n"); !strings.Contains(text, "admin_audit_log_created_at_idx") {
-		t.Errorf("newest-first page does not use admin_audit_log_created_at_idx:\n%s", text)
-	}
+	return strings.Join(lines, "\n")
 }
 
 func TestAdminAuditLog_ConstraintsRejectMalformedRows(t *testing.T) {
