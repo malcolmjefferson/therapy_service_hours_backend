@@ -471,6 +471,7 @@ A working single-file HTML app (`therapy-hours-tracker.html`) defines the UX to 
 - Multiple clients are separated by `; `. A literal `|` in a cell is escaped as `\|`. A client of `—` or empty means none.
 - Older files may have a single client and no `Clients / Groups` section: merge client names found in entries into the saved list (case-insensitive de-dupe).
 - **New export format** adds `Start` and `End` columns; the importer must accept both layouts (no times means "Needs time").
+- **Parser rules (S4-02, `internal/service/importexport`):** columns are found by header name, so their order does not matter (`Start` and `End` go together or not at all; unknown columns are ignored). A row's `Start` and `End` are both empty (or `—`) for a legacy row. `Hours` is read as a plain decimal and rounded to whole minutes; with times, the times decide the duration and `Hours` may be empty or off by one minute. Times are `HH:MM` on 15-minute steps with the end after the start. `\|` is a literal pipe. A bad row is reported with the `SkipReason` of the OpenAPI spec and the rest are kept. A file over 1 MiB, with more than 5,000 rows, that is not UTF-8, or with no valid entries table is refused whole.
 
 ---
 

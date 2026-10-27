@@ -38,6 +38,10 @@ func (f *fakeEntries) List(context.Context, domain.Actor, entries.ListRequest) (
 	return entries.Page{}, f.err
 }
 
+func (f *fakeEntries) Export(context.Context, domain.Actor, entries.ExportRequest) (entries.Page, error) {
+	return entries.Page{}, f.err
+}
+
 func (f *fakeEntries) Get(_ context.Context, a domain.Actor, id string) (domain.Entry, error) {
 	f.calls, f.actor, f.gotID = append(f.calls, "get"), a, id
 	return f.entry, f.err
