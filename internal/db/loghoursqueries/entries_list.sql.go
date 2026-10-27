@@ -48,6 +48,60 @@ func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int
 	return count, err
 }
 
+const exportEntries = `-- name: ExportEntries :many
+SELECT e.id, e.user_id, e.session_date, e.start_time, e.end_time, e.duration_minutes, e.category_id, e.on_site, e.notes, e.status, e.needs_time, e.reviewed_by, e.reviewed_at, e.review_note, e.created_at, e.updated_at
+FROM entries e
+WHERE e.user_id = $1
+ORDER BY e.session_date ASC, e.start_time ASC NULLS FIRST, e.id ASC
+LIMIT $3::int OFFSET $2::int
+`
+
+type ExportEntriesParams struct {
+	UserID     pgtype.UUID
+	PageOffset int32
+	PageSize   int32
+}
+
+// S4-06: the export read (FR-IO-04). The whole ledger of one user, oldest first, no filters.
+// Entries without times (needs_time) come before timed entries of the same date, which is the order
+// api/openapi.yaml promises for exportEntries. e.id is the unique tiebreaker, so pages are stable.
+func (q *Queries) ExportEntries(ctx context.Context, arg ExportEntriesParams) ([]Entry, error) {
+	rows, err := q.db.Query(ctx, exportEntries, arg.UserID, arg.PageOffset, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Entry{}
+	for rows.Next() {
+		var i Entry
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.SessionDate,
+			&i.StartTime,
+			&i.EndTime,
+			&i.DurationMinutes,
+			&i.CategoryID,
+			&i.OnSite,
+			&i.Notes,
+			&i.Status,
+			&i.NeedsTime,
+			&i.ReviewedBy,
+			&i.ReviewedAt,
+			&i.ReviewNote,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEntriesCategoryAsc = `-- name: ListEntriesCategoryAsc :many
 SELECT e.id, e.user_id, e.session_date, e.start_time, e.end_time, e.duration_minutes, e.category_id, e.on_site, e.notes, e.status, e.needs_time, e.reviewed_by, e.reviewed_at, e.review_note, e.created_at, e.updated_at
 FROM entries e

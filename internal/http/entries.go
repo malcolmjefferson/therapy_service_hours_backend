@@ -29,6 +29,9 @@ type EntryService interface {
 	Update(ctx context.Context, actor domain.Actor, entryID string, in entries.Input) (domain.Entry, error)
 	// Delete removes a pending or rejected entry; an approved one is a *domain.EntryLockedError.
 	Delete(ctx context.Context, actor domain.Actor, entryID string) error
+	// Export returns a page of everything the actor has logged, oldest first, or a
+	// *domain.ValidationError for a bad page or page size.
+	Export(ctx context.Context, actor domain.Actor, req entries.ExportRequest) (entries.Page, error)
 }
 
 // ListEntries returns the caller's own entries. The handler only translates: the service validates
@@ -38,18 +41,51 @@ func (s *server) ListEntries(ctx context.Context, request gen.ListEntriesRequest
 	if err != nil {
 		return nil, err //nolint:wrapcheck // WriteError maps domain errors to problems (GO-33).
 	}
+	list, err := entryListResponse(page)
+	if err != nil {
+		return nil, err
+	}
+	return gen.ListEntries200JSONResponse(list), nil
+}
+
+// entryListResponse maps a page of entries to the owner DTOs (GO-54).
+func entryListResponse(page entries.Page) (gen.EntryListResponse, error) {
 	items := make([]gen.Entry, 0, len(page.Items))
 	for _, e := range page.Items {
 		dto, err := entryForOwner(e)
 		if err != nil {
-			return nil, err
+			return gen.EntryListResponse{}, err
 		}
 		items = append(items, dto)
 	}
-	return gen.ListEntries200JSONResponse{
+	return gen.EntryListResponse{
 		Items: items,
 		Page:  gen.PageInfo{Page: int32(page.Page), PageSize: int32(page.PageSize), TotalItems: page.TotalItems}, //nolint:gosec // G115: bounded by the service (page 1..100000, size 1..200).
 	}, nil
+}
+
+// ExportEntries returns a page of the caller's whole ledger for the Markdown, CSV and PDF exports.
+// It maps entries with the same owner DTO as ListEntries; the service validates paging and the
+// store scopes the query to the actor (GO-10, SEC-10).
+func (s *server) ExportEntries(ctx context.Context, request gen.ExportEntriesRequestObject) (gen.ExportEntriesResponseObject, error) {
+	req := entries.ExportRequest{}
+	if p := request.Params.Page; p != nil {
+		v := int(*p)
+		req.Page = &v
+	}
+	if p := request.Params.PageSize; p != nil {
+		v := int(*p)
+		req.PageSize = &v
+	}
+	page, err := s.entries.Export(ctx, ActorFrom(ctx), req)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // WriteError maps domain errors to problems (GO-33).
+	}
+	list, err := entryListResponse(page)
+	if err != nil {
+		return nil, err
+	}
+	return gen.ExportEntries200JSONResponse(list), nil
 }
 
 // GetEntry returns one of the caller's own entries; another user's id is 404, never 403.
