@@ -1,0 +1,121 @@
+{
+  "Clients": [
+    "Pseudonym A"
+  ],
+  "ClientNotices": [
+    {
+      "Line": 5,
+      "Message": "Client name must be at most 64 characters."
+    }
+  ],
+  "Rows": [
+    {
+      "Number": 1,
+      "Date": "2026-03-02T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "Pseudonym A"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": true,
+      "Notes": "valid row"
+    },
+    {
+      "Number": 9,
+      "Date": "2026-03-05T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "Pseudonym A"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": true,
+      "Notes": ""
+    },
+    {
+      "Number": 11,
+      "Date": "2026-03-06T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "x' OR '1'='1"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": true,
+      "Notes": "DROP TABLE entries -- is just text"
+    },
+    {
+      "Number": 12,
+      "Date": "2026-03-07T00:00:00Z",
+      "StartTime": "",
+      "EndTime": "",
+      "Group": "direct",
+      "Category": "Individual Counseling",
+      "Clients": [
+        "=HYPERLINK(\"x\")"
+      ],
+      "DurationMinutes": 60,
+      "OnSite": true,
+      "Notes": "=1+1 stays text"
+    }
+  ],
+  "Skipped": [
+    {
+      "Number": 2,
+      "Reason": "invalid-date",
+      "Field": "date",
+      "Message": "The date must be a real date written YYYY-MM-DD."
+    },
+    {
+      "Number": 3,
+      "Reason": "invalid-hours",
+      "Field": "hours",
+      "Message": "The hours must be a number greater than 0 and at most 24."
+    },
+    {
+      "Number": 4,
+      "Reason": "invalid-hours",
+      "Field": "hours",
+      "Message": "The hours must be a number greater than 0 and at most 24."
+    },
+    {
+      "Number": 5,
+      "Reason": "invalid-hours",
+      "Field": "hours",
+      "Message": "The hours must be a number greater than 0 and at most 24."
+    },
+    {
+      "Number": 6,
+      "Reason": "unknown-category",
+      "Field": "group",
+      "Message": "The group must be Direct Service, Indirect Service or Supervision."
+    },
+    {
+      "Number": 7,
+      "Reason": "unknown-category",
+      "Field": "category",
+      "Message": "The category must be 1 to 100 characters of plain text."
+    },
+    {
+      "Number": 8,
+      "Reason": "malformed-row",
+      "Field": "",
+      "Message": "The On-site value must be Yes or No."
+    },
+    {
+      "Number": 10,
+      "Reason": "malformed-row",
+      "Field": "",
+      "Message": "The row has 9 columns; the table has 7."
+    }
+  ],
+  "TotalRows": 12,
+  "HasTimeColumns": false
+}
