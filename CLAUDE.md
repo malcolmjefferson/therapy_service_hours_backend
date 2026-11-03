@@ -279,7 +279,7 @@ Pending ──approve──► Approved (locked) ──revert (reason required)�
 - Every status change writes `entry_status_history` (who, when, from/to, reason).
 - **Bulk approve:** supervisor selects several entries or a date range; runs in one transaction and reports any skipped entries. Updates are conditional (`WHERE status = 'pending'`) so concurrent actions cannot double-apply.
 
-**Legacy imports:** entries imported from the prototype's Markdown have no times. They import flagged **"Needs time"**: they keep their hours and count toward goals but are excluded from schedules until a time is added. New entries always require times.
+**Legacy imports:** entries imported from the prototype's Markdown have no times. They import flagged **"Needs time"**: they keep their hours and count toward goals but are excluded from schedules until a time is added. New entries always require times. **Adding the times (S4-05):** the person edits the entry like any other (`PUT /entries/{id}`, which always requires both times), and the same save clears the flag, replaces the imported hours with the length calculated from the times, and keeps the entry pending. A save without both times is refused (400) and the entry stays flagged; the edit rules for approved and rejected entries are unchanged. The overlap check ignores a "Needs time" entry, so legacy entries never clash with anything; once it has times it is checked like any other session, and a clash is the usual 409 `entry-overlap` that leaves it flagged. The table shows a **"Needs time"** badge for these entries.
 
 ### 7.2 Goals and progress
 
