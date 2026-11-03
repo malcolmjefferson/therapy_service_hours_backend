@@ -357,7 +357,7 @@ Primary keys are UUIDs. All timestamps are `timestamptz` except session times (l
 | `supervision_links` | `id`, `supervisee_id`, `supervisor_id`, `organization_id`, `status` (`pending`/`accepted`/`declined`/`cancelled`/`ended`), `requested_at`, `responded_at`, `ended_at`, `ended_by` |
 | `entry_status_history` | `id`, `entry_id`, `from_status`, `to_status`, `changed_by` (nullable), `changed_by_name` (snapshot), `reason`, `changed_at` |
 | `notifications` | `id`, `user_id`, `type`, `payload` (jsonb), `read_at`, `created_at` |
-| `admin_audit_log` | `id`, `actor_id`, `actor_name`, `action`, `target_user_id`, `details` (jsonb), `created_at` |
+| `admin_audit_log` | `id`, `actor_id` (nullable), `actor_name`, `action`, `target_user_id` (nullable), `target_name` (nullable snapshot), `details` (jsonb object), `created_at`; both user references are `ON DELETE SET NULL` so rows survive permanent deletion and the name snapshots keep them readable; index `(created_at DESC, id DESC)` serves newest-first paging; the app role has INSERT and SELECT only (ARC-23) |
 
 **Constraints (enforce in the DB, not only in code)**
 - `entries`: `end_time > start_time`; start and end both null or both set; `duration_minutes` consistent with times when present; minutes divisible by 15; **overlap exclusion** per user (via `btree_gist`) for non-rejected entries with times.

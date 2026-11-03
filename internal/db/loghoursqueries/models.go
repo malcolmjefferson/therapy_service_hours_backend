@@ -8,6 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AdminAuditLog struct {
+	ID           pgtype.UUID
+	ActorID      pgtype.UUID
+	ActorName    string
+	Action       string
+	TargetUserID pgtype.UUID
+	TargetName   pgtype.Text
+	Details      []byte
+	CreatedAt    pgtype.Timestamptz
+}
+
 type Category struct {
 	ID            pgtype.UUID
 	Name          string
