@@ -56,6 +56,11 @@ var statements = []string{
 	   IF to_regclass('public.users') IS NOT NULL THEN GRANT SELECT ON public.users TO presignup_ro; END IF;
 	   IF to_regclass('public.invitations') IS NOT NULL THEN GRANT SELECT ON public.invitations TO presignup_ro; END IF;
 	 END $$`,
+	// Audit tables are append-only (ARC-23): migration 00005 revokes UPDATE and DELETE from app_rw
+	// as it creates admin_audit_log; this covers a bootstrap that runs afterwards.
+	`DO $$ BEGIN
+	   IF to_regclass('public.admin_audit_log') IS NOT NULL THEN REVOKE UPDATE, DELETE ON public.admin_audit_log FROM app_rw; END IF;
+	 END $$`,
 	`REVOKE migrator FROM CURRENT_USER`,
 }
 
