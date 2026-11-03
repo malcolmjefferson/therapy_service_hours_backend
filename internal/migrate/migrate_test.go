@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -42,7 +43,7 @@ func TestRun_AppliesTheMigrationsThenIsANoOp(t *testing.T) {
 	conn := open(t, database)
 
 	first := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{})
-	if first.Status != migrate.StatusOK || len(first.Applied) != 6 || first.Applied[0] != 1 || first.Applied[1] != 2 || first.Applied[2] != 3 || first.Applied[3] != 4 || first.Applied[4] != 5 || first.Applied[5] != 6 || first.Version != 6 {
+	if first.Status != migrate.StatusOK || !slices.Equal(first.Applied, []int64{1, 2, 3, 4, 5, 6}) || first.Version != 6 {
 		t.Fatalf("first run = %+v", first)
 	}
 	second := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{})
