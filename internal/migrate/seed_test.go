@@ -165,7 +165,7 @@ func TestSeedRunsWithTableDMLOnly(t *testing.T) {
 	pool := seedPool(t)
 	_, err := pool.Exec(t.Context(), `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'seed_test_writer') THEN CREATE ROLE seed_test_writer LOGIN PASSWORD 'local-test-password'; END IF; END $$;
 	GRANT USAGE ON SCHEMA public TO seed_test_writer;
-	GRANT SELECT, INSERT, UPDATE, DELETE ON organizations, users, invitations TO seed_test_writer;`)
+	GRANT SELECT, INSERT, UPDATE, DELETE ON organizations, users, invitations, goals TO seed_test_writer;`)
 	if err != nil {
 		t.Fatal(err)
 	}
