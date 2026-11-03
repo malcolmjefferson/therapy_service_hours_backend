@@ -12,6 +12,7 @@
 - **S3 (goals and progress):** S3-01 done, merged to main (migration `00006_goals.sql`; applied to dev by the next pipeline run); the other backend S3 tickets are not started.
 - **S4 (import and export):** S4-01 done, merged to main (OpenAPI for `POST /import/markdown` and `GET /export/entries`); S4-06 done, merged to main (`GET /export/entries`); S4-02 done, merged to main (Markdown ledger parser); S4-03 done, merged to main (import service); the other backend S4 tickets are not started.
 - **S5 (organizations and admin):** S5-01 done, merged to main (migration `00005_admin_audit_log.sql`; applied to dev by the next pipeline run); the other backend S5 tickets are not started.
+- **S6 (supervision and notifications):** S6-01 in review (migration `00007_supervision_notifications.sql`, [backend #75](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/75)); the other backend S6 tickets are not started.
 
 ## Tickets
 
@@ -82,3 +83,9 @@ Statuses: **not started**, **in progress**, **in review** (PR open), **done** (m
 | ID | Title | Status | PRs | Notes |
 |---|---|---|---|---|
 | S5-01 | Migration: admin_audit_log and user lifecycle columns | done | [backend #66](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/66) | Migration `00005_admin_audit_log.sql` creates the append-only `admin_audit_log`: actor and target name snapshots, a dotted lowercase `action`, a `details` jsonb object (at most 8 KiB), and both user references `ON DELETE SET NULL`, so rows survive permanent deletion of the target or the actor. Index `(created_at DESC, id DESC)` serves newest-first paging (a test checks the planner uses it). `app_rw` has INSERT and SELECT only (ARC-23): the migration and the role bootstrap both revoke UPDATE and DELETE, and role tests prove it while a user named in the log can still be deleted. `users.status` and `deactivated_at` already existed from `00002` (S1-04), so no `users` column is added. `target_name` is an addition to the CLAUDE.md §9 sketch, documented there. The migration reaches dev with the next pipeline run. |
+
+## S6 execution (2026-11-03)
+
+| ID | Title | Status | PRs | Notes |
+|---|---|---|---|---|
+| S6-01 | Migration: supervision_links and notifications with DB-enforced rules | in review | [backend #75](https://github.com/malcolmjefferson/therapy_service_hours_backend/pull/75) | Migration `00007_supervision_notifications.sql` (numbered after S5-01's `00005` and S3-01's `00006`). `supervision_links` has a partial unique index (one `pending` or `accepted` link per supervisee), a self-link check, and a trigger that requires supervisee and supervisor to belong to the link's organization while the link is `pending` or `accepted` (SQLSTATE 23514; it locks both user rows `FOR SHARE`, re-checks on accept and never blocks declining, cancelling or ending). State checks tie `responded_at` and `ended_at` to the status. `notifications` has a dotted lowercase `type`, a jsonb object `payload` (at most 8 KiB), `read_at`, and indexes for the newest-first inbox and the unread-count poll. Both tables cascade with their users; `app_rw` gets DML through the default privileges. PostgreSQL tests cover cross-organization inserts, a second live link, self-links, concurrent requests (one winner), an organization change racing a request, cascades and the app role. The trigger does not stop an admin changing a user's organization while a link is live: S6-08 ends those links in the same transaction. No OpenAPI change. Once merged, the migration reaches dev with the next pipeline run. |
