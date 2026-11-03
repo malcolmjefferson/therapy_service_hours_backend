@@ -20,6 +20,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/categories"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/importexport"
 )
 
 func main() {
@@ -64,6 +65,11 @@ func run() error {
 		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
 	}
 
+	importService, err := importexport.New(db.NewImportStore(store))
+	if err != nil {
+		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
+	}
+
 	router, err := httpapi.NewRouter(httpapi.RouterDeps{
 		Logger:        logger,
 		Version:       cfg.Version,
@@ -74,6 +80,7 @@ func run() error {
 		Entries:       entryService,
 		Clients:       clientService,
 		Categories:    categoryService,
+		Imports:       importService,
 		Idempotency:   db.NewIdempotencyStore(store),
 	})
 	if err != nil {

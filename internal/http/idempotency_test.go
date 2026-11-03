@@ -355,7 +355,7 @@ func TestIdempotency_ClientsCreateIsCoveredToo(t *testing.T) {
 func TestIdempotentOperations_AreExactlyThePostsThatDeclareTheHeader(t *testing.T) {
 	t.Parallel()
 	got := idempotentOperations(loadSpec(t))
-	want := map[string]bool{"POST /api/v1/entries": true, "POST /api/v1/clients": true}
+	want := map[string]bool{"POST /api/v1/entries": true, "POST /api/v1/clients": true, "POST /api/v1/import/markdown": true}
 	if len(got) != len(want) {
 		t.Fatalf("operations = %v, want %v", got, want)
 	}
