@@ -364,6 +364,7 @@ Primary keys are UUIDs. All timestamps are `timestamptz` except session times (l
 - `supervision_links`: partial unique index on `(supervisee_id)` where status is `pending` or `accepted`; `supervisor_id <> supervisee_id`; validation that supervisee and supervisor share the link's `organization_id` (trigger or equivalent).
 - `invitations`: at most one `pending` invitation per email (partial unique index), so a re-invite after a delete or an email change does not collide; `expires_at` is checked by the pre-sign-up trigger, and **first sign-in** sets `status = 'accepted'` with `accepted_at` in the same transaction that binds `cognito_sub` (ADR-0010).
 - Indexes for the schedule path: `(user_id, session_date, start_time)`.
+- Index for goal progress (S3-02): `(user_id, status) INCLUDE (category_id, on_site, duration_minutes)`. `GetProgressMinutes` (`db/queries/loghours/progress.sql`) reads it once per request and returns approved and pending minutes for Direct, Supervision (with the Group / Individual split), Total Activity and On-site in one row; rejected entries are never read, and a user with no entries gets zeros.
 - Keep approved-entry immutability enforced in the service layer with a DB-level backstop.
 
 ---
