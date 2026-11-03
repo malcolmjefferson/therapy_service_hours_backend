@@ -80,7 +80,17 @@ type linkRow struct {
 	status           string
 	requested        time.Time
 	responded, ended *time.Time
-	endedBy          *string
+	endedByUser      *string
+}
+
+// pendingAndOpen reports a link as it is right after the request: no response, end or ender.
+func (r linkRow) pendingAndOpen() bool {
+	return r.status == "pending" && !r.requested.IsZero() && r.responded == nil && r.ended == nil && r.endedByUser == nil
+}
+
+// wasEndedBy reports an accepted-then-ended link closed by the named user.
+func (r linkRow) wasEndedBy(user string) bool {
+	return r.status == "ended" && r.responded != nil && r.ended != nil && r.endedByUser != nil && *r.endedByUser == user
 }
 
 func readLink(t *testing.T, pool *pgxpool.Pool, id string) linkRow {
@@ -88,7 +98,7 @@ func readLink(t *testing.T, pool *pgxpool.Pool, id string) linkRow {
 	var r linkRow
 	err := pool.QueryRow(t.Context(),
 		`SELECT status, requested_at, responded_at, ended_at, ended_by::text FROM supervision_links WHERE id = $1::uuid`, id).
-		Scan(&r.status, &r.requested, &r.responded, &r.ended, &r.endedBy)
+		Scan(&r.status, &r.requested, &r.responded, &r.ended, &r.endedByUser)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +112,7 @@ func TestSupervisionLinks_RequestAcceptAndEndStoreTheLifecycle(t *testing.T) {
 	supervisor := insertUserIn(t, pool, org, "supervisor@example.test")
 
 	link := mustRequestLink(t, pool, org, supervisee, supervisor)
-	if r := readLink(t, pool, link); r.status != "pending" || r.requested.IsZero() || r.responded != nil || r.ended != nil || r.endedBy != nil {
+	if r := readLink(t, pool, link); !r.pendingAndOpen() {
 		t.Fatalf("new link = %+v, want pending with no response or end", r)
 	}
 	if err := setStatus(t, pool, link, acceptLink); err != nil {
@@ -115,7 +125,7 @@ func TestSupervisionLinks_RequestAcceptAndEndStoreTheLifecycle(t *testing.T) {
 		t.Fatalf("end: %v", err)
 	}
 	r := readLink(t, pool, link)
-	if r.status != "ended" || r.responded == nil || r.ended == nil || r.endedBy == nil || *r.endedBy != supervisor {
+	if !r.wasEndedBy(supervisor) {
 		t.Fatalf("ended link = %+v", r)
 	}
 
