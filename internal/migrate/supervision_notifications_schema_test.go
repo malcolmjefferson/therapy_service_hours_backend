@@ -76,6 +76,25 @@ const (
 	endLink     = `status = 'ended', ended_at = now()`
 )
 
+type linkRow struct {
+	status           string
+	requested        time.Time
+	responded, ended *time.Time
+	endedBy          *string
+}
+
+func readLink(t *testing.T, pool *pgxpool.Pool, id string) linkRow {
+	t.Helper()
+	var r linkRow
+	err := pool.QueryRow(t.Context(),
+		`SELECT status, requested_at, responded_at, ended_at, ended_by::text FROM supervision_links WHERE id = $1::uuid`, id).
+		Scan(&r.status, &r.requested, &r.responded, &r.ended, &r.endedBy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
 func TestSupervisionLinks_RequestAcceptAndEndStoreTheLifecycle(t *testing.T) {
 	pool := seedPool(t)
 	org := defaultOrganization(t, pool)
@@ -83,36 +102,21 @@ func TestSupervisionLinks_RequestAcceptAndEndStoreTheLifecycle(t *testing.T) {
 	supervisor := insertUserIn(t, pool, org, "supervisor@example.test")
 
 	link := mustRequestLink(t, pool, org, supervisee, supervisor)
-	var status string
-	var requested time.Time
-	var responded, ended any
-	var endedBy *string
-	read := func() {
-		t.Helper()
-		err := pool.QueryRow(t.Context(),
-			`SELECT status, requested_at, responded_at, ended_at, ended_by::text FROM supervision_links WHERE id = $1::uuid`, link).
-			Scan(&status, &requested, &responded, &ended, &endedBy)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	read()
-	if status != "pending" || requested.IsZero() || responded != nil || ended != nil || endedBy != nil {
-		t.Fatalf("new link = %s %v %v %v %v, want pending with no response or end", status, requested, responded, ended, endedBy)
+	if r := readLink(t, pool, link); r.status != "pending" || r.requested.IsZero() || r.responded != nil || r.ended != nil || r.endedBy != nil {
+		t.Fatalf("new link = %+v, want pending with no response or end", r)
 	}
 	if err := setStatus(t, pool, link, acceptLink); err != nil {
 		t.Fatalf("accept: %v", err)
 	}
-	read()
-	if status != "accepted" || responded == nil {
-		t.Fatalf("accepted link = %s responded %v", status, responded)
+	if r := readLink(t, pool, link); r.status != "accepted" || r.responded == nil {
+		t.Fatalf("accepted link = %+v", r)
 	}
 	if err := setStatus(t, pool, link, `status = 'ended', ended_at = now(), ended_by = '`+supervisor+`'`); err != nil {
 		t.Fatalf("end: %v", err)
 	}
-	read()
-	if status != "ended" || responded == nil || ended == nil || endedBy == nil || *endedBy != supervisor {
-		t.Fatalf("ended link = %s responded %v ended %v by %v", status, responded, ended, endedBy)
+	r := readLink(t, pool, link)
+	if r.status != "ended" || r.responded == nil || r.ended == nil || r.endedBy == nil || *r.endedBy != supervisor {
+		t.Fatalf("ended link = %+v", r)
 	}
 
 	// History is kept and the supervisee can ask someone new (CLAUDE.md §6.2).
