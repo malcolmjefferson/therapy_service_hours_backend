@@ -73,10 +73,10 @@ func (s *server) GetMe(ctx context.Context, _ gen.GetMeRequestObject) (gen.GetMe
 	}
 	roles := make([]gen.MeResponseRoles, 0, 2)
 	if authz.Admin(a) {
-		roles = append(roles, gen.Admin)
+		roles = append(roles, gen.MeResponseRolesAdmin)
 	}
 	if authz.Supervisor(a) {
-		roles = append(roles, gen.Supervisor)
+		roles = append(roles, gen.MeResponseRolesSupervisor)
 	}
 	return gen.GetMe200JSONResponse{Id: id, Email: openapi_types.Email(a.Email), Name: strings.TrimSpace(a.FirstName + " " + a.LastName), Roles: roles, Organization: gen.OrganizationProfile{Id: orgID, Name: a.OrganizationName}}, nil
 }

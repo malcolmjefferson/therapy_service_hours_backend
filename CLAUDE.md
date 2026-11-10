@@ -384,7 +384,7 @@ Base path `/api/v1`. The bearer credential is the Cognito **ID token**, validate
 | Supervisor | list supervisees; supervisee summary; supervisee entries; approve / reject / bulk approve | Supervisor |
 | Schedules | `GET /schedules/peers?search=`; `GET /schedules/{userId}?weekStart=` (must be a Monday) | User |
 | Notifications | `GET /notifications`; `POST /notifications/{id}/read`; `POST /notifications/read-all`; `GET /notifications/unread-count` (S6-02) | All |
-| Admin | organizations CRUD; users create / edit / deactivate / delete; role assignment | Admin |
+| Admin | `/admin/organizations` CRUD; `/admin/users` create / edit / roles / email / organization (with preview) / deactivate / reactivate / delete; `GET /admin/audit` (contract: S5-02, `api/openapi.yaml`) | Admin |
 
 Observability: `/healthz`, structured JSON logs (`slog`) with request IDs, CloudWatch alarms on errors and 5xx, OpenTelemetry hooks where inexpensive. API Gateway throttling on all routes, with tighter limits on search.
 

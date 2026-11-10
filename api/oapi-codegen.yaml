@@ -13,6 +13,7 @@ output-options:
   # list. S4-01 published the import and export operations; S4-06 implemented exportEntries and S4-04
   # implemented importMarkdown, so nothing was excluded after that. S6-02 published the supervision
   # and notification operations; S6-03 to S6-07 implement them and each removes its own.
+  # S5-02 published the admin operations; S5-03 to S5-12 implement them and each removes its own.
   exclude-operation-ids:
     - searchSupervisors
     - listSupervisionLinks
@@ -25,3 +26,19 @@ output-options:
     - getUnreadNotificationCount
     - markAllNotificationsRead
     - markNotificationRead
+    - listAdminOrganizations
+    - createAdminOrganization
+    - renameAdminOrganization
+    - deleteAdminOrganization
+    - listAdminUsers
+    - createAdminUser
+    - getAdminUser
+    - updateAdminUser
+    - deleteAdminUser
+    - setAdminUserRoles
+    - changeAdminUserEmail
+    - setAdminUserOrganization
+    - previewAdminUserOrganizationChange
+    - deactivateAdminUser
+    - reactivateAdminUser
+    - listAdminAudit

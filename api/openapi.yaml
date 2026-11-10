@@ -40,6 +40,12 @@ tags:
     description: Supervisor search and the supervision link lifecycle (request, cancel, accept, decline, end)
   - name: notifications
     description: The current user's in-app notifications
+  - name: admin-organizations
+    description: Admin only. Create, rename and delete organizations
+  - name: admin-users
+    description: Admin only. Invite, edit, set roles, move, deactivate and delete users
+  - name: admin-audit
+    description: Admin only. The append-only log of admin actions
 paths:
   /me:
     get:
@@ -876,6 +882,591 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
+  /admin/organizations:
+    get:
+      operationId: listAdminOrganizations
+      tags: [admin-organizations]
+      summary: List all organizations with their member counts
+      description: |
+        Admin only (FR-ADM-01). Admin scope is global, so every organization is listed. Ordered by
+        name (case-insensitive), then `id`. A non-admin caller is **403** `urn:therapy-service-hours:problem:forbidden`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of organizations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrganizationListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createAdminOrganization
+      tags: [admin-organizations]
+      summary: Create an organization
+      description: |
+        Admin only (FR-ADM-01). Names are unique, ignoring case and surrounding spaces. A name that
+        is taken is **409** `urn:therapy-service-hours:problem:organization-name-taken`. The change is
+        written to the audit log in the same transaction.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminOrganizationRequest'
+      responses:
+        '201':
+          description: The organization was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrganization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '409':
+          $ref: '#/components/responses/AdminOrganizationConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/organizations/{organizationId}:
+    parameters:
+      - $ref: '#/components/parameters/OrganizationId'
+    patch:
+      operationId: renameAdminOrganization
+      tags: [admin-organizations]
+      summary: Rename an organization
+      description: |
+        Admin only (FR-ADM-01). A name another organization already uses (ignoring case) is **409**
+        `urn:therapy-service-hours:problem:organization-name-taken`; changing only the letter case of
+        the organization's own name is allowed. An unknown organization is **404**. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminOrganizationRequest'
+      responses:
+        '200':
+          description: The renamed organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrganization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AdminOrganizationConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: deleteAdminOrganization
+      tags: [admin-organizations]
+      summary: Delete an organization that has no members
+      description: |
+        Admin only (FR-ADM-01). An organization that any user belongs to, active or deactivated, is
+        not deleted: the answer is **409** `urn:therapy-service-hours:problem:organization-not-empty`
+        with `user_count`. There is no way to force it. An unknown organization is **404**. Audited.
+      responses:
+        '204':
+          description: The organization was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AdminOrganizationConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin-users]
+      summary: List users for administration
+      description: |
+        Admin only (FR-ADM-02). This is the one user list that includes **deactivated** users, because
+        an admin must find them to reactivate or permanently delete them (FR-ADM-05); every other list
+        and search hides them (FR-ADM-09). Use `status` to narrow it. Filters combine with AND.
+        `search` is a case-insensitive substring match against first name, last name, the full name
+        and email; `%`, `_` and `\` in it match literally (SEC-20 to SEC-25). `sort` and `dir` take
+        only the listed values, anything else is **400**. The default order is name ascending; ties are
+        broken by `id`, so pages are stable. The response describes people only: it never carries
+        entries, notes or clients (FR-ADM-10).
+      parameters:
+        - name: search
+          in: query
+          description: Only users whose name or email contains this text, ignoring case.
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+        - name: organization_id
+          in: query
+          description: Only users in this organization.
+          required: false
+          schema:
+            type: string
+            format: uuid
+            maxLength: 36
+        - name: role
+          in: query
+          description: Only users who hold this role.
+          required: false
+          schema:
+            $ref: '#/components/schemas/AdminRole'
+        - name: status
+          in: query
+          description: Only users with this status. Omit to list both.
+          required: false
+          schema:
+            $ref: '#/components/schemas/AdminUserStatus'
+        - name: sort
+          in: query
+          description: Column to sort by.
+          required: false
+          schema:
+            type: string
+            enum: [name, email, organization, created_at]
+            default: name
+        - name: dir
+          in: query
+          description: Sort direction.
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createAdminUser
+      tags: [admin-users]
+      summary: Invite a user
+      description: |
+        Admin only (FR-ADM-02, US-29). Creates the user row and a pending invitation together, then
+        the identity step prepares the Cognito side, so the person can sign in with Google. The
+        organization is required; a missing or unknown `organization_id` is **400** `validation`.
+        An email that belongs to another user, or that has a pending invitation, is **409**
+        `urn:therapy-service-hours:problem:user-email-taken`.
+
+        The work runs as one workflow (ADR-0002). If the identity step fails, the workflow undoes the
+        database reservation and the answer is **502**
+        `urn:therapy-service-hours:problem:identity-failure`; nothing was created and the same request
+        can be sent again with the same `Idempotency-Key`. If the workflow does not finish in time the
+        answer is **504** `urn:therapy-service-hours:problem:workflow-timeout`; the outcome is not
+        known, so read the user list before retrying.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserCreateRequest'
+      responses:
+        '201':
+          description: The user was created and invited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '409':
+          $ref: '#/components/responses/AdminUserConflict'
+        '502':
+          $ref: '#/components/responses/IdentityFailure'
+        '504':
+          $ref: '#/components/responses/WorkflowTimeout'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      operationId: getAdminUser
+      tags: [admin-users]
+      summary: Read one user for administration
+      description: |
+        Admin only. Includes a deactivated user. The response describes the person only, never their
+        entries or notes (FR-ADM-10). An unknown user is **404**.
+      responses:
+        '200':
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    patch:
+      operationId: updateAdminUser
+      tags: [admin-users]
+      summary: Edit a user's name
+      description: |
+        Admin only (FR-ADM-02). Changes the name fields that are sent. Roles, organization and email
+        have their own operations because each has side effects: roles and email also change Cognito,
+        and a new organization ends supervision links. An unknown user is **404**. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdateRequest'
+      responses:
+        '200':
+          description: The updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: deleteAdminUser
+      tags: [admin-users]
+      summary: Permanently delete a deactivated user
+      description: |
+        Admin only (FR-ADM-05, US-32). The second step of deletion: it removes the user's entries,
+        clients, supervision links and notifications and the Cognito user. Only a **deactivated** user
+        can be deleted; an active user is **409** `urn:therapy-service-hours:problem:user-not-deactivated`.
+        The audit log keeps a snapshot of the display name (SEC-44). The UI asks the admin to type the
+        user's name first; the API itself needs no confirmation field. The last-admin rule (FR-ADM-06)
+        is enforced when an admin is deactivated, so a deactivated user is never the last active admin.
+        Workflow failures map as on `createAdminUser` (**502**, **504**). An unknown user, including one
+        already deleted, is **404**.
+      responses:
+        '204':
+          description: The user and their data were deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AdminUserConflict'
+        '502':
+          $ref: '#/components/responses/IdentityFailure'
+        '504':
+          $ref: '#/components/responses/WorkflowTimeout'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}/roles:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      operationId: setAdminUserRoles
+      tags: [admin-users]
+      summary: Set the full role set of a user
+      description: |
+        Admin only (FR-ADM-03, US-30). Replaces the roles: `[]` is an ordinary user, and the base
+        user capability is always kept. The database is authoritative; the Cognito groups follow in
+        the same workflow, and the change takes effect on the user's next request at the latest
+        (ADR-0002). Removing `admin` from the last remaining admin is **409**
+        `urn:therapy-service-hours:problem:last-admin` (FR-ADM-06). Workflow failures map as on
+        `createAdminUser` (**502**, **504**). An unknown user is **404**. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserRolesRequest'
+      responses:
+        '200':
+          description: The user with the new roles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AdminUserConflict'
+        '502':
+          $ref: '#/components/responses/IdentityFailure'
+        '504':
+          $ref: '#/components/responses/WorkflowTimeout'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}/email:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      operationId: changeAdminUserEmail
+      tags: [admin-users]
+      summary: Change a user's email and re-invite them
+      description: |
+        Admin only (FR-ADM-08, US-35). The old invitation is revoked and the old email loses access
+        immediately (Cognito and the allowlist); a new pending invitation is created for the new
+        email. The user keeps the same `id` and all data, and their first sign-in with the new email
+        binds to the existing row. An email another user or a pending invitation already uses is
+        **409** `urn:therapy-service-hours:problem:user-email-taken`. Sending the user's current email
+        is **400** `validation`. Workflow failures map as on `createAdminUser` (**502**, **504**). An
+        unknown user is **404**. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserEmailRequest'
+      responses:
+        '200':
+          description: The user, signed out and awaiting the new sign-in (`has_signed_in` false).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AdminUserConflict'
+        '502':
+          $ref: '#/components/responses/IdentityFailure'
+        '504':
+          $ref: '#/components/responses/WorkflowTimeout'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}/organization:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      operationId: setAdminUserOrganization
+      tags: [admin-users]
+      summary: Move a user to another organization
+      description: |
+        Admin only (FR-ADM-04, US-31). Ends the user's supervision link and cancels their pending
+        requests; for a supervisor it also ends every supervisee's link. Nothing changes until the
+        admin has seen the consequences, so the request must carry `confirm_consequences: true`
+        (anything else is **400**); read them first from `previewAdminUserOrganizationChange`. The
+        target organization must exist (**400** `validation` otherwise) and differ from the current
+        one. An unknown user is **404**. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserOrganizationRequest'
+      responses:
+        '200':
+          description: The user in the new organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}/organization-change-preview:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      operationId: previewAdminUserOrganizationChange
+      tags: [admin-users]
+      summary: Preview what moving a user to another organization would end
+      description: |
+        Admin only (FR-ADM-04, US-31). Changes nothing. The counts feed the confirmation dialog; they
+        are zero until supervision links exist (S6). A target organization that does not exist or is
+        the user's current one is **400** `validation`. An unknown user is **404**.
+      parameters:
+        - name: organization_id
+          in: query
+          description: The organization the user would move to.
+          required: true
+          schema:
+            type: string
+            format: uuid
+            maxLength: 36
+      responses:
+        '200':
+          description: What the move would do.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrganizationChangePreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      operationId: deactivateAdminUser
+      tags: [admin-users]
+      summary: Deactivate a user
+      description: |
+        Admin only (FR-ADM-05, FR-ADM-09, US-32). The first step of deletion: blocks sign-in (Cognito
+        user disabled and signed out), hides the user from every list, search and schedule except the
+        admin user list, and keeps all data. Deactivating the last remaining admin is **409**
+        `urn:therapy-service-hours:problem:last-admin` (FR-ADM-06). Deactivating a user who is already
+        deactivated returns the user unchanged. Workflow failures map as on `createAdminUser` (**502**,
+        **504**). An unknown user is **404**. Audited.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The deactivated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AdminUserConflict'
+        '502':
+          $ref: '#/components/responses/IdentityFailure'
+        '504':
+          $ref: '#/components/responses/WorkflowTimeout'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/users/{userId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      operationId: reactivateAdminUser
+      tags: [admin-users]
+      summary: Reactivate a deactivated user
+      description: |
+        Admin only (FR-ADM-05, US-32). Restores access: the Cognito user is enabled and the user
+        appears in lists again, with their data intact. Reactivating a user who is already active
+        returns the user unchanged. Workflow failures map as on `createAdminUser` (**502**, **504**).
+        An unknown user is **404**. Audited.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The reactivated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/IdentityFailure'
+        '504':
+          $ref: '#/components/responses/WorkflowTimeout'
+        default:
+          $ref: '#/components/responses/Problem'
+  /admin/audit:
+    get:
+      operationId: listAdminAudit
+      tags: [admin-audit]
+      summary: Page through the admin audit log
+      description: |
+        Admin only (FR-ADM-07, US-34). Every admin action, newest first (`created_at`, then `id`, both
+        descending), so pages are stable. Rows survive the permanent deletion of the actor or the
+        target; the name snapshots keep them readable. The log is read-only through the API and
+        contains no entry, note or client content (FR-ADM-10).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of audit rows, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAuditListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     cognitoJwt:
@@ -958,6 +1549,24 @@ components:
       name: notificationId
       in: path
       description: Notification identifier.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
+    OrganizationId:
+      name: organizationId
+      in: path
+      description: Organization identifier.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
+    UserId:
+      name: userId
+      in: path
+      description: User identifier.
       required: true
       schema:
         type: string
@@ -1050,6 +1659,56 @@ components:
         The upload is over a limit. `type` is `urn:therapy-service-hours:problem:body-too-large`
         (the file is over 1 MiB) or `urn:therapy-service-hours:problem:import-too-many-rows` (the
         entries table has more than 5,000 rows). Nothing was stored.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    AdminForbidden:
+      description: |
+        The caller is not an active admin, or is deactivated. `type` is
+        `urn:therapy-service-hours:problem:forbidden`. Roles come from the database, not the token,
+        and nothing is started or changed. Every admin route answers this way (US-30).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    AdminOrganizationConflict:
+      description: |
+        `type` is `urn:therapy-service-hours:problem:organization-name-taken` (another organization
+        has that name, ignoring case) or `urn:therapy-service-hours:problem:organization-not-empty`
+        (users still belong to the organization; `user_count` says how many). On `POST` it can also be
+        an idempotency problem (see the `Idempotency-Key` parameter).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/AdminOrganizationConflictProblem'
+    AdminUserConflict:
+      description: |
+        The action is refused in the user's current state. `type` is one of
+        `urn:therapy-service-hours:problem:user-email-taken` (the email belongs to another user or has a
+        pending invitation), `urn:therapy-service-hours:problem:last-admin` (the action would leave no
+        active admin; FR-ADM-06), or `urn:therapy-service-hours:problem:user-not-deactivated`
+        (only a deactivated user can be permanently deleted). Nothing was changed. Where the operation
+        takes `Idempotency-Key` it can also be an idempotency problem.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdentityFailure:
+      description: |
+        The identity step (Cognito) failed or was unreachable, and the workflow ran its compensation:
+        the database was returned to its state before the request. `type` is
+        `urn:therapy-service-hours:problem:identity-failure`. Nothing changed; the request can be
+        repeated, with the same `Idempotency-Key` where the operation takes one.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    WorkflowTimeout:
+      description: |
+        The workflow did not finish within the API Gateway limit. `type` is
+        `urn:therapy-service-hours:problem:workflow-timeout`. The outcome is **unknown**: the action
+        may have completed or been compensated. Read the user again before repeating it.
       content:
         application/problem+json:
           schema:
@@ -1630,6 +2289,312 @@ components:
           type: integer
           format: int64
           minimum: 0
+    AdminRole:
+      type: string
+      description: A role an admin can grant. The base user capability is held by everyone and is not listed.
+      enum: [admin, supervisor]
+    AdminUserStatus:
+      type: string
+      description: '`deactivated` users cannot sign in and are hidden from every list except the admin user list.'
+      enum: [active, deactivated]
+    AdminOrganization:
+      type: object
+      description: An organization as the admin console sees it.
+      additionalProperties: false
+      required: [id, name, user_count, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 200
+        user_count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Users who belong to the organization, active and deactivated. Delete is refused while this is above 0.
+        created_at:
+          type: string
+          format: date-time
+    AdminOrganizationRequest:
+      type: object
+      description: Create or rename an organization. Unknown fields are rejected.
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Unique, ignoring case. Surrounding spaces are removed.
+          minLength: 1
+          maxLength: 200
+    AdminOrganizationListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AdminOrganization'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    AdminOrganizationConflictProblem:
+      description: |
+        A 409 Problem for an organization. `user_count` is present only for `organization-not-empty`.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            user_count:
+              type: integer
+              format: int32
+              minimum: 1
+    AdminUser:
+      type: object
+      description: |
+        A person as the admin console sees them. It describes the account only; it has no entries,
+        notes or clients and never references the entry schemas (FR-ADM-10, ARC-18).
+      additionalProperties: false
+      required: [id, first_name, last_name, name, email, roles, organization, status, has_signed_in, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        first_name:
+          type: string
+          maxLength: 200
+        last_name:
+          type: string
+          maxLength: 200
+        name:
+          type: string
+          description: Display name, `first_name` and `last_name`, or the email when both are empty.
+          maxLength: 401
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        roles:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          description: Roles held. An ordinary user has an empty array.
+          items:
+            $ref: '#/components/schemas/AdminRole'
+        organization:
+          $ref: '#/components/schemas/OrganizationProfile'
+        status:
+          $ref: '#/components/schemas/AdminUserStatus'
+        deactivated_at:
+          type: string
+          format: date-time
+          description: Present only while the user is deactivated.
+        has_signed_in:
+          type: boolean
+          description: True once a first sign-in has bound the user to an identity. False for an invited user who has not signed in yet.
+        invitation_status:
+          type: string
+          description: |
+            State of the user's latest invitation. `pending` can still be redeemed; `expired` needs a
+            new invitation; `accepted` was redeemed by the first sign-in. Absent when the user has none.
+          enum: [pending, expired, accepted]
+        invitation_expires_at:
+          type: string
+          format: date-time
+          description: Present while `invitation_status` is `pending` or `expired`.
+        created_at:
+          type: string
+          format: date-time
+    AdminUserListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    AdminUserCreateRequest:
+      type: object
+      description: Invite a user. The organization is required. Unknown fields are rejected.
+      additionalProperties: false
+      required: [first_name, last_name, email, organization_id]
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          description: The Google account the person will sign in with. Unique among users, ignoring case.
+          maxLength: 254
+        roles:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          description: Roles to grant. Defaults to none (an ordinary user).
+          items:
+            $ref: '#/components/schemas/AdminRole'
+        organization_id:
+          type: string
+          format: uuid
+          maxLength: 36
+    AdminUserUpdateRequest:
+      type: object
+      description: Edit a user's name. At least one field is required. Unknown fields are rejected.
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+    AdminUserRolesRequest:
+      type: object
+      description: The complete role set. Unknown fields are rejected.
+      additionalProperties: false
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/AdminRole'
+    AdminUserEmailRequest:
+      type: object
+      description: The user's new email. Unknown fields are rejected.
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+    AdminUserOrganizationRequest:
+      type: object
+      description: Move a user. Unknown fields are rejected.
+      additionalProperties: false
+      required: [organization_id, confirm_consequences]
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          maxLength: 36
+        confirm_consequences:
+          type: boolean
+          description: Must be `true`; the admin has seen the consequences from the preview.
+          enum: [true]
+    AdminOrganizationChangePreview:
+      type: object
+      description: What an organization change would do. Nothing has changed when this is returned.
+      additionalProperties: false
+      required: [user_id, current_organization, target_organization, is_supervisor, consequences]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          maxLength: 36
+        current_organization:
+          $ref: '#/components/schemas/OrganizationProfile'
+        target_organization:
+          $ref: '#/components/schemas/OrganizationProfile'
+        is_supervisor:
+          type: boolean
+          description: True when the user holds the supervisor role, so their supervisees' links end too.
+        consequences:
+          $ref: '#/components/schemas/AdminOrganizationChangeConsequences'
+    AdminOrganizationChangeConsequences:
+      type: object
+      additionalProperties: false
+      required: [links_ended, requests_cancelled]
+      properties:
+        links_ended:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Accepted supervision links that would end, as supervisee and, for a supervisor, as supervisor.
+        requests_cancelled:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Pending supervision requests that would be cancelled.
+    AdminAuditEntry:
+      type: object
+      description: One audit row. Names are snapshots taken when the action happened.
+      additionalProperties: false
+      required: [id, created_at, action, actor_name, details]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        created_at:
+          type: string
+          format: date-time
+        action:
+          type: string
+          description: |
+            Dotted lowercase action name, for example `organization.create`, `organization.rename`,
+            `organization.delete`, `user.create`, `user.update`, `user.roles_change`,
+            `user.organization_change`, `user.email_change`, `user.deactivate`, `user.reactivate` or
+            `user.delete`. Clients display unknown names as they are.
+          pattern: '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$'
+          maxLength: 100
+        actor_id:
+          type: string
+          format: uuid
+          maxLength: 36
+          description: The admin who acted. Absent once that user has been permanently deleted.
+        actor_name:
+          type: string
+          maxLength: 400
+        target_user_id:
+          type: string
+          format: uuid
+          maxLength: 36
+          description: The user acted on. Absent for actions on no user, and once that user has been permanently deleted.
+        target_name:
+          type: string
+          maxLength: 400
+          description: Display name of the user acted on, when the action had one. It stays after that user is deleted.
+        details:
+          $ref: '#/components/schemas/AdminAuditDetails'
+    AdminAuditDetails:
+      type: object
+      description: |
+        What changed, as a small JSON object (for example the old and new role set). Keys depend on
+        `action`. It holds account facts only, never entry, note or client content.
+      additionalProperties: true
+      maxProperties: 50
+    AdminAuditListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/AdminAuditEntry'
+        page:
+          $ref: '#/components/schemas/PageInfo'
     GatewayUnauthorized:
       type: object
       required: [message]
