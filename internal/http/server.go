@@ -25,6 +25,7 @@ type server struct {
 	entries    EntryService
 	clients    ClientService
 	categories CategoryService
+	goals      GoalService
 	imports    ImportService
 }
 

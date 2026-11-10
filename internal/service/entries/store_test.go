@@ -28,6 +28,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/categories"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/goals"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/importexport"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/testpg"
 )
@@ -81,6 +82,10 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	goalService, err := goals.New(db.NewGoalStore(pool))
+	if err != nil {
+		t.Fatal(err)
+	}
 	importService, err := importexport.New(db.NewImportStore(pool))
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +100,7 @@ func newEnv(t *testing.T) *env {
 		Entries:       service,
 		Clients:       clientService,
 		Categories:    categoryService,
+		Goals:         goalService,
 		Imports:       importService,
 		Idempotency:   db.NewIdempotencyStore(pool),
 	})

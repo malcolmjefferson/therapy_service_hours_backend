@@ -27,6 +27,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/categories"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/goals"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/importexport"
 )
 
@@ -59,6 +60,10 @@ func newAPI(t *testing.T) *api {
 	if err != nil {
 		t.Fatal(err)
 	}
+	goalService, err := goals.New(db.NewGoalStore(e.pool))
+	if err != nil {
+		t.Fatal(err)
+	}
 	a.router, err = httpapi.NewRouter(httpapi.RouterDeps{
 		Logger:       slog.New(slog.NewJSONHandler(io.Discard, nil)),
 		Version:      "test",
@@ -74,6 +79,7 @@ func newAPI(t *testing.T) *api {
 		Entries:     entryService,
 		Clients:     clientService,
 		Categories:  categoryService,
+		Goals:       goalService,
 		Imports:     e.service,
 		Idempotency: db.NewIdempotencyStore(e.pool),
 	})

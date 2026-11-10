@@ -20,6 +20,7 @@ import (
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/categories"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/clients"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/entries"
+	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/goals"
 	"github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/importexport"
 )
 
@@ -65,6 +66,11 @@ func run() error {
 		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
 	}
 
+	goalService, err := goals.New(db.NewGoalStore(store))
+	if err != nil {
+		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
+	}
+
 	importService, err := importexport.New(db.NewImportStore(store))
 	if err != nil {
 		return err //nolint:wrapcheck // Startup misconfiguration; the message is already specific.
@@ -80,6 +86,7 @@ func run() error {
 		Entries:       entryService,
 		Clients:       clientService,
 		Categories:    categoryService,
+		Goals:         goalService,
 		Imports:       importService,
 		Idempotency:   db.NewIdempotencyStore(store),
 	})
@@ -88,19 +95,24 @@ func run() error {
 	}
 
 	if cfg.LocalHTTPAddr != "" {
-		logger.Info("serving local HTTP", slog.String("addr", cfg.LocalHTTPAddr), slog.String("version", cfg.Version))
-		srv := &http.Server{
-			Addr:              cfg.LocalHTTPAddr,
-			Handler:           router,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return err //nolint:wrapcheck // Local development only.
-		}
-		return nil
+		return serveLocal(logger, cfg, router)
 	}
 
 	logger.Info("starting Lambda handler", slog.String("version", cfg.Version))
 	lambda.Start(apigw.Handler(router, httpapi.ContextWithRequestID))
+	return nil
+}
+
+// serveLocal runs the API on a plain HTTP port for local development only.
+func serveLocal(logger *slog.Logger, cfg config.Config, router http.Handler) error {
+	logger.Info("serving local HTTP", slog.String("addr", cfg.LocalHTTPAddr), slog.String("version", cfg.Version))
+	srv := &http.Server{
+		Addr:              cfg.LocalHTTPAddr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err //nolint:wrapcheck // Local development only.
+	}
 	return nil
 }

@@ -35,6 +35,8 @@ type RouterDeps struct {
 	Clients ClientService
 	// Categories is the category lookup use case (S2-08).
 	Categories CategoryService
+	// Goals is the goal targets and progress use case (S3-03).
+	Goals GoalService
 	// Imports is the Markdown import use case (S4-04).
 	Imports ImportService
 	// Idempotency stores Idempotency-Key claims and responses for the create operations (S2-09).
@@ -70,6 +72,9 @@ func (d RouterDeps) validate() error {
 	if d.Categories == nil {
 		errs = append(errs, errors.New("categories service is required"))
 	}
+	if d.Goals == nil {
+		errs = append(errs, errors.New("goals service is required"))
+	}
 	if d.Imports == nil {
 		errs = append(errs, errors.New("import service is required"))
 	}
@@ -89,7 +94,7 @@ func NewRouter(deps RouterDeps) (http.Handler, error) {
 		return nil, fmt.Errorf("load embedded OpenAPI spec: %w", err)
 	}
 	r := newMux(deps)
-	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients, categories: deps.Categories, imports: deps.Imports}, deps.ActorResolver, deps.Idempotency, spec)
+	mountAPI(r, &server{version: deps.Version, entries: deps.Entries, clients: deps.Clients, categories: deps.Categories, goals: deps.Goals, imports: deps.Imports}, deps.ActorResolver, deps.Idempotency, spec)
 	return r, nil
 }
 
