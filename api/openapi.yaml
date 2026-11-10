@@ -36,6 +36,10 @@ tags:
     description: The current user's own hours entries
   - name: import-export
     description: Import of the prototype's Markdown ledger and export of the current user's entries
+  - name: supervision
+    description: Supervisor search and the supervision link lifecycle (request, cancel, accept, decline, end)
+  - name: notifications
+    description: The current user's in-app notifications
 paths:
   /me:
     get:
@@ -529,6 +533,349 @@ paths:
           $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Problem'
+  /supervisors:
+    get:
+      operationId: searchSupervisors
+      tags: [supervision]
+      summary: Search active supervisors in the caller's organization
+      description: |
+        Lists active supervisors in the **caller's own organization**, ordered by last name, first
+        name, then `id`. Supervisors in other organizations, deactivated supervisors and the caller
+        are never returned. `search` matches the start or any part of a first or last name,
+        ignoring case; `%`, `_` and `\` in it match literally. A `search` longer than 64
+        characters is a `400`. Each item is a dedicated DTO (id and display name only; no email,
+        roles or organization). The page that lists them shows the caller's own link state from
+        `GET /supervision-links?role=as_supervisee`.
+      parameters:
+        - name: search
+          in: query
+          description: Part of a first or last name. Wildcard characters match literally.
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of supervisors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisorListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+  /supervision-links:
+    get:
+      operationId: listSupervisionLinks
+      tags: [supervision]
+      summary: List the caller's supervision links
+      description: |
+        `role=as_supervisee` lists links where the caller is the supervisee (their current supervisor
+        or pending request, and their history); `role=as_supervisor` lists links where the caller is
+        the supervisor, which is the **inbox** with `status=pending` and the accepted supervisees
+        with `status=accepted`. Only the caller's own links are returned; a user who is not a
+        supervisor gets an empty list for `role=as_supervisor`. Newest request first, then `id`.
+      parameters:
+        - name: role
+          in: query
+          description: Which side of the link the caller is on.
+          required: true
+          schema:
+            $ref: '#/components/schemas/SupervisionRole'
+        - name: status
+          in: query
+          description: Only links in this status. All statuses when omitted.
+          required: false
+          schema:
+            $ref: '#/components/schemas/SupervisionLinkStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of links.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionLinkListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createSupervisionLink
+      tags: [supervision]
+      summary: Request supervision from a supervisor
+      description: |
+        Creates a `pending` link from the caller to `supervisor_id` and notifies the supervisor in
+        the same transaction. The supervisor must be an active supervisor in the caller's
+        organization; anyone else (another organization, not a supervisor, deactivated, a missing
+        id) is `404`, so existence is not disclosed. Requesting yourself is `400`. A caller with a
+        pending or accepted link gets **409**
+        `urn:therapy-service-hours:problem:supervision-link-exists`; cancel or end it first.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupervisionRequest'
+      responses:
+        '201':
+          description: The request was created and is pending.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SupervisionConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /supervision-links/{linkId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/LinkId'
+    post:
+      operationId: cancelSupervisionLink
+      tags: [supervision]
+      summary: Cancel the caller's pending request
+      description: |
+        Only the supervisee can cancel, and only while the link is `pending`. Any other caller, or
+        a link that does not exist, is `404`. The link is no longer pending: **409**
+        `urn:therapy-service-hours:problem:supervision-request-no-longer-valid`. Repeating the call
+        is safe because the state check answers it, so no `Idempotency-Key` is taken.
+      x-idempotency: not-required
+      responses:
+        '200':
+          description: The cancelled link.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SupervisionConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /supervision-links/{linkId}/accept:
+    parameters:
+      - $ref: '#/components/parameters/LinkId'
+    post:
+      operationId: acceptSupervisionLink
+      tags: [supervision]
+      summary: Accept a pending request
+      description: |
+        Only the link's supervisor can accept. The organization and link state are re-checked
+        inside the transaction: a link that was cancelled, answered already, or whose people no
+        longer share an organization is **409**
+        `urn:therapy-service-hours:problem:supervision-request-no-longer-valid`. Any other caller,
+        or a missing link, is `404`. The supervisee is notified. No `Idempotency-Key` is taken
+        because the state check answers a repeat.
+      x-idempotency: not-required
+      responses:
+        '200':
+          description: The accepted link.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SupervisionConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /supervision-links/{linkId}/decline:
+    parameters:
+      - $ref: '#/components/parameters/LinkId'
+    post:
+      operationId: declineSupervisionLink
+      tags: [supervision]
+      summary: Decline a pending request
+      description: |
+        Only the link's supervisor can decline, and no reason is needed or accepted. The supervisee
+        is notified. A link that is no longer pending is **409**
+        `urn:therapy-service-hours:problem:supervision-request-no-longer-valid`; any other caller,
+        or a missing link, is `404`. No `Idempotency-Key` is taken because the state check answers
+        a repeat.
+      x-idempotency: not-required
+      responses:
+        '200':
+          description: The declined link.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SupervisionConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /supervision-links/{linkId}/end:
+    parameters:
+      - $ref: '#/components/parameters/LinkId'
+    post:
+      operationId: endSupervisionLink
+      tags: [supervision]
+      summary: End an accepted link
+      description: |
+        The supervisee, the supervisor or an admin can end an `accepted` link. History and past
+        approvals are kept, and the other party is notified. Any other caller, or a missing link,
+        is `404`. A link that is not accepted is **409**
+        `urn:therapy-service-hours:problem:supervision-link-not-active`. No `Idempotency-Key` is
+        taken because the state check answers a repeat.
+      x-idempotency: not-required
+      responses:
+        '200':
+          description: The ended link.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SupervisionConflict'
+        default:
+          $ref: '#/components/responses/Problem'
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List the caller's notifications
+      description: Only the caller's own notifications, newest first, then `id`.
+      parameters:
+        - name: unread_only
+          in: query
+          description: Set to `true` to list only unread notifications.
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of notifications.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+  /notifications/unread-count:
+    get:
+      operationId: getUnreadNotificationCount
+      tags: [notifications]
+      summary: Count the caller's unread notifications
+      description: |
+        Polled by the client about every 60 seconds and when the window regains focus, so it
+        returns only the count.
+      responses:
+        '200':
+          description: The number of unread notifications.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all of the caller's notifications read
+      description: |
+        Marks every unread notification of the caller read. Repeating it changes nothing (the
+        second answer has `marked_count` 0), so no `Idempotency-Key` is taken.
+      x-idempotency: not-required
+      responses:
+        '200':
+          description: How many notifications were newly marked read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReadResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+  /notifications/{notificationId}/read:
+    parameters:
+      - $ref: '#/components/parameters/NotificationId'
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark one notification read
+      description: |
+        Marks the caller's notification read. Already-read notifications are returned unchanged
+        (the original `read_at` is kept), so no `Idempotency-Key` is taken. Another user's
+        notification, or a missing one, is `404`.
+      x-idempotency: not-required
+      responses:
+        '200':
+          description: The notification.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     cognitoJwt:
@@ -593,6 +940,24 @@ components:
       name: clientId
       in: path
       description: Client identifier.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
+    LinkId:
+      name: linkId
+      in: path
+      description: Supervision link identifier.
+      required: true
+      schema:
+        type: string
+        format: uuid
+        maxLength: 36
+    NotificationId:
+      name: notificationId
+      in: path
+      description: Notification identifier.
       required: true
       schema:
         type: string
@@ -664,6 +1029,18 @@ components:
         The request cannot be completed in the current state. `type` is an idempotency problem (see
         the `Idempotency-Key` parameter): `urn:therapy-service-hours:problem:idempotency-key-reused`
         or `urn:therapy-service-hours:problem:idempotency-key-in-progress`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    SupervisionConflict:
+      description: |
+        `type` is `urn:therapy-service-hours:problem:supervision-link-exists` (the caller already
+        has a pending or accepted link), `urn:therapy-service-hours:problem:supervision-request-no-longer-valid`
+        (the request is no longer pending, or its people no longer share an organization) or
+        `urn:therapy-service-hours:problem:supervision-link-not-active` (the link is not accepted).
+        On `POST /supervision-links` it can also be an idempotency problem (see the
+        `Idempotency-Key` parameter).
       content:
         application/problem+json:
           schema:
@@ -1080,6 +1457,179 @@ components:
         - unknown-category
         - invalid-client
         - invalid-notes
+    PersonRef:
+      type: object
+      description: A person as other members of a supervision link see them. Display name only.
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 401
+    SupervisorSummary:
+      type: object
+      description: A supervisor in the caller's organization, as listed by the search.
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 401
+    SupervisorListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/SupervisorSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    SupervisionRole:
+      type: string
+      description: |
+        Which side of the link the caller is on. The values are not the bare role names so the
+        generated Go constants do not collide with the `MeResponse` roles `admin` and `supervisor`.
+      enum: [as_supervisee, as_supervisor]
+    SupervisionLinkStatus:
+      type: string
+      enum: [pending, accepted, declined, cancelled, ended]
+    SupervisionRequest:
+      type: object
+      description: Request supervision from one supervisor. Unknown fields are rejected.
+      additionalProperties: false
+      required: [supervisor_id]
+      properties:
+        supervisor_id:
+          type: string
+          format: uuid
+          maxLength: 36
+    SupervisionLink:
+      type: object
+      additionalProperties: false
+      required: [id, status, supervisee, supervisor, requested_at, responded_at, ended_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        status:
+          $ref: '#/components/schemas/SupervisionLinkStatus'
+        supervisee:
+          $ref: '#/components/schemas/PersonRef'
+        supervisor:
+          $ref: '#/components/schemas/PersonRef'
+        requested_at:
+          type: string
+          format: date-time
+        responded_at:
+          type: [string, 'null']
+          format: date-time
+          description: When the supervisor accepted or declined; null for a pending or cancelled request.
+        ended_at:
+          type: [string, 'null']
+          format: date-time
+          description: When an accepted link was ended; null otherwise.
+    SupervisionLinkListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/SupervisionLink'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    NotificationType:
+      type: string
+      description: |
+        The event. New values may be added within v1, so clients show an unknown type generically.
+      enum:
+        - supervision.request_received
+        - supervision.request_accepted
+        - supervision.request_declined
+        - supervision.link_ended
+    NotificationPayload:
+      type: object
+      description: |
+        What the inbox needs to render the event. Display names and ids only (never client names,
+        notes or email addresses), at most 8 KiB.
+      additionalProperties: false
+      properties:
+        link_id:
+          type: string
+          format: uuid
+          maxLength: 36
+        actor_id:
+          type: string
+          format: uuid
+          maxLength: 36
+        actor_name:
+          type: string
+          description: Display name of the person whose action caused the notification.
+          maxLength: 401
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [id, type, payload, read_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          maxLength: 36
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        payload:
+          $ref: '#/components/schemas/NotificationPayload'
+        read_at:
+          type: [string, 'null']
+          format: date-time
+          description: Null while unread.
+        created_at:
+          type: string
+          format: date-time
+    NotificationListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/Notification'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    UnreadCount:
+      type: object
+      additionalProperties: false
+      required: [unread_count]
+      properties:
+        unread_count:
+          type: integer
+          format: int64
+          minimum: 0
+    MarkAllReadResult:
+      type: object
+      additionalProperties: false
+      required: [marked_count]
+      properties:
+        marked_count:
+          type: integer
+          format: int64
+          minimum: 0
     GatewayUnauthorized:
       type: object
       required: [message]
