@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -107,6 +108,54 @@ func (a *api) minutesByCategory(userID string) map[string]int {
 	return got
 }
 
+// exportedDates reads the whole export, 200 entries a page, and returns the session dates in order.
+func (a *api) exportedDates(sub string) []string {
+	a.t.Helper()
+	var dates []string
+	for page := 1; ; page++ {
+		res := a.get(sub, "/export/entries", fmt.Sprintf("page=%d&page_size=200", page))
+		var body struct {
+			Items []struct {
+				SessionDate string `json:"session_date"`
+			}
+			Page struct {
+				TotalItems int `json:"total_items"`
+			}
+		}
+		if err := json.Unmarshal([]byte(res.body), &body); err != nil || res.status != http.StatusOK {
+			a.t.Fatalf("export page %d = %d %.200s (%v)", page, res.status, res.body, err)
+		}
+		for _, it := range body.Items {
+			dates = append(dates, it.SessionDate)
+		}
+		if len(dates) >= body.Page.TotalItems || len(body.Items) == 0 {
+			return dates
+		}
+	}
+}
+
+// wantReimportSkipsAll imports text again and requires every one of its rows to be a duplicate.
+func (a *api) wantReimportSkipsAll(sub, text string, rows int) {
+	a.t.Helper()
+	again := decodeReport(a.t, a.post(upload{sub: sub, content: []byte(text)}))
+	if again.ImportedCount != 0 || again.SkippedCount != rows {
+		a.t.Errorf("re-import = %+v, want all %d rows skipped", again, rows)
+	}
+	for _, s := range again.SkippedRows {
+		if s.Reason != "duplicate" {
+			a.t.Fatalf("row %d skipped as %q, want duplicate", s.Row, s.Reason)
+		}
+	}
+}
+
+// wantAllImported requires a report with every row imported, none skipped and needsTime flagged.
+func wantAllImported(t *testing.T, r reportBody, rows, needsTime int) {
+	t.Helper()
+	if r.TotalRows != rows || r.ImportedCount != rows || r.SkippedCount != 0 || r.NeedsTimeCount != needsTime {
+		t.Fatalf("report = %+v, want %d rows imported, %d needing a time, none skipped (%v)", r, rows, needsTime, r.SkippedRows)
+	}
+}
+
 func TestCorpus_APrototypeLedgerOfSixHundredRowsImportsEveryRowOnce(t *testing.T) {
 	a := newAPI(t)
 	me := a.e.user("trainee@example.test")
@@ -115,9 +164,7 @@ func TestCorpus_APrototypeLedgerOfSixHundredRowsImportsEveryRowOnce(t *testing.T
 
 	report := decodeReport(t, a.post(upload{sub: sub, content: []byte(c.text)}))
 
-	if report.TotalRows != c.rows || report.ImportedCount != c.rows || report.SkippedCount != 0 || report.NeedsTimeCount != c.rows {
-		t.Fatalf("report = %+v, want all %d rows imported and flagged needs time", report, c.rows)
-	}
+	wantAllImported(t, report, c.rows, c.rows)
 	if got := a.e.entryCount(me); got != c.rows {
 		t.Errorf("%d entries stored, want %d", got, c.rows)
 	}
@@ -139,47 +186,14 @@ func TestCorpus_APrototypeLedgerOfSixHundredRowsImportsEveryRowOnce(t *testing.T
 		t.Errorf("%d notes keep the escape backslash, want the bare pipe", n)
 	}
 
-	// The export pages (200 at a time) hold exactly the same entries, oldest first.
-	var dates []string
-	for page := 1; ; page++ {
-		res := a.get(sub, "/export/entries", fmt.Sprintf("page=%d&page_size=200", page))
-		var body struct {
-			Items []struct {
-				SessionDate string `json:"session_date"`
-			}
-			Page struct {
-				TotalItems int `json:"total_items"`
-			}
-		}
-		if err := json.Unmarshal([]byte(res.body), &body); err != nil || res.status != http.StatusOK {
-			t.Fatalf("export page %d = %d %.200s (%v)", page, res.status, res.body, err)
-		}
-		for _, it := range body.Items {
-			dates = append(dates, it.SessionDate)
-		}
-		if len(dates) >= body.Page.TotalItems || len(body.Items) == 0 {
-			break
-		}
-	}
-	if len(dates) != c.rows {
-		t.Fatalf("export returned %d entries, want %d", len(dates), c.rows)
-	}
-	for i := 1; i < len(dates); i++ {
-		if dates[i] < dates[i-1] {
-			t.Fatalf("export is not oldest first at %d: %s after %s", i, dates[i], dates[i-1])
-		}
+	// The export pages hold exactly the same entries, oldest first.
+	dates := a.exportedDates(sub)
+	if len(dates) != c.rows || !sort.StringsAreSorted(dates) {
+		t.Fatalf("export returned %d entries (sorted: %v), want %d oldest first", len(dates), sort.StringsAreSorted(dates), c.rows)
 	}
 
 	// Importing the same file again adds nothing: every row is reported as a duplicate.
-	again := decodeReport(t, a.post(upload{sub: sub, content: []byte(c.text)}))
-	if again.ImportedCount != 0 || again.SkippedCount != c.rows {
-		t.Errorf("re-import = %+v, want all %d rows skipped", again, c.rows)
-	}
-	for _, s := range again.SkippedRows {
-		if s.Reason != "duplicate" {
-			t.Fatalf("row %d skipped as %q, want duplicate", s.Row, s.Reason)
-		}
-	}
+	a.wantReimportSkipsAll(sub, c.text, c.rows)
 	if a.e.entryCount(me) != c.rows {
 		t.Error("the re-import changed the entry count")
 	}
@@ -246,6 +260,56 @@ func craftedLedger() string {
 	return b.String()
 }
 
+// wantStoredOnce requires each value to be stored exactly once, unchanged: as a note when notes is
+// true, otherwise as a client name.
+func (a *api) wantStoredOnce(userID string, notes bool, values []string) {
+	a.t.Helper()
+	query := `SELECT count(*) FROM clients WHERE user_id = $1 AND name = $2`
+	if notes {
+		query = `SELECT count(*) FROM entries WHERE user_id = $1 AND notes = $2`
+	}
+	for _, want := range values {
+		if n := a.e.count(query, userID, want); n != 1 {
+			a.t.Errorf("%q stored %d times, want once exactly as written", want, n)
+		}
+	}
+}
+
+// wantTablesIntact requires that no payload dropped or changed another table.
+func (a *api) wantTablesIntact(userID string) {
+	a.t.Helper()
+	for _, table := range []string{"entries", "clients", "users", "categories", "organizations"} {
+		if n := a.e.count(`SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = $1`, table); n != 1 {
+			a.t.Errorf("table %s is gone", table)
+		}
+	}
+	if a.e.count(`SELECT count(*) FROM users`) != 1 || a.e.count(`SELECT count(*) FROM categories`) != 12 {
+		a.t.Error("an injected statement changed another table")
+	}
+	if n := a.e.count(`SELECT count(*) FROM entries WHERE user_id = $1 AND status <> 'pending'`, userID); n != 0 {
+		a.t.Errorf("%d entries are not pending", n)
+	}
+}
+
+// wantExportedNotes requires the export to hand back every note exactly as stored.
+func (a *api) wantExportedNotes(sub string, want []string) {
+	a.t.Helper()
+	res := a.get(sub, "/export/entries", "page_size=200")
+	var body struct{ Items []struct{ Notes string } }
+	if err := json.Unmarshal([]byte(res.body), &body); err != nil || res.status != http.StatusOK {
+		a.t.Fatalf("export = %d %.200s (%v)", res.status, res.body, err)
+	}
+	got := map[string]bool{}
+	for _, it := range body.Items {
+		got[it.Notes] = true
+	}
+	for _, n := range want {
+		if !got[n] {
+			a.t.Errorf("export lacks note %q", n)
+		}
+	}
+}
+
 func TestCorpus_CraftedRowsAreImportedLiterally(t *testing.T) {
 	a := newAPI(t)
 	me := a.e.user("trainee@example.test")
@@ -256,63 +320,18 @@ func TestCorpus_CraftedRowsAreImportedLiterally(t *testing.T) {
 
 	// The shared date, category and length do not make a row a duplicate of another: `100%` and `100x`,
 	// `a_c` and `abc`, `%` and every other note stay distinct, so nothing is matched as a pattern.
-	if report.TotalRows != len(crafted) || report.ImportedCount != len(crafted) || report.SkippedCount != 0 {
-		t.Fatalf("report = %+v, want %d imported and none skipped (%v)", report, len(crafted), report.SkippedRows)
-	}
-	for _, want := range crafted {
-		if n := a.e.count(`SELECT count(*) FROM entries WHERE user_id = $1 AND notes = $2`, me.ID, want); n != 1 {
-			t.Errorf("note %q stored %d times, want once exactly as written", want, n)
-		}
-	}
-	for _, want := range craftedClients {
-		if n := a.e.count(`SELECT count(*) FROM clients WHERE user_id = $1 AND name = $2`, me.ID, want); n != 1 {
-			t.Errorf("client %q saved %d times, want once exactly as written", want, n)
-		}
-	}
+	wantAllImported(t, report, len(crafted), 0)
+	a.wantStoredOnce(me.ID, true, crafted)
+	a.wantStoredOnce(me.ID, false, craftedClients)
 	// `_` and `%` in a name make no other client the same one.
 	if n := a.e.clientCount(me); n != len(craftedClients) {
 		t.Errorf("%d clients saved, want %d separate ones", n, len(craftedClients))
 	}
-
-	// Nothing the payloads name ran: tables and rows are intact, and no entry was approved.
-	for _, table := range []string{"entries", "clients", "users", "categories", "organizations"} {
-		if n := a.e.count(`SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = $1`, table); n != 1 {
-			t.Errorf("table %s is gone", table)
-		}
-	}
-	if a.e.count(`SELECT count(*) FROM users`) != 1 || a.e.count(`SELECT count(*) FROM categories`) != 12 {
-		t.Error("an injected statement changed another table")
-	}
-	if n := a.e.count(`SELECT count(*) FROM entries WHERE user_id = $1 AND status <> 'pending'`, me.ID); n != 0 {
-		t.Errorf("%d entries are not pending", n)
-	}
-
-	// The export hands every cell back exactly as stored.
-	res := a.get(sub, "/export/entries", "page_size=200")
-	var body struct {
-		Items []struct {
-			Notes   string
-			Clients []struct{ Name string }
-		}
-	}
-	if err := json.Unmarshal([]byte(res.body), &body); err != nil || res.status != http.StatusOK {
-		t.Fatalf("export = %d %.200s (%v)", res.status, res.body, err)
-	}
-	notes := map[string]bool{}
-	for _, it := range body.Items {
-		notes[it.Notes] = true
-	}
-	for _, want := range crafted {
-		if !notes[want] {
-			t.Errorf("export lacks note %q", want)
-		}
-	}
+	a.wantTablesIntact(me.ID)
+	a.wantExportedNotes(sub, crafted)
 
 	// Importing the file again matches every row by value, so none is added.
-	again := decodeReport(t, a.post(upload{sub: sub, content: []byte(text)}))
-	if again.ImportedCount != 0 || again.SkippedCount != len(crafted) {
-		t.Errorf("re-import = %+v, want all %d rows skipped as duplicates", again, len(crafted))
-	}
+	a.wantReimportSkipsAll(sub, text, len(crafted))
 	if a.e.entryCount(me) != len(crafted) {
 		t.Error("the re-import changed the entry count")
 	}
