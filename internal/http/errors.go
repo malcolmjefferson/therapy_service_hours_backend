@@ -18,6 +18,9 @@ func problemFor(err error) Problem {
 	var overlap *domain.EntryOverlapError
 	var locked *domain.EntryLockedError
 	var maxErr *http.MaxBytesError
+	if refusal, ok := importRefusal(err); ok {
+		return refusal
+	}
 	switch {
 	case errors.Is(err, authn.ErrUnauthorized):
 		return Problem{Type: ProblemUnauthorized, Title: "Unauthorized", Status: http.StatusUnauthorized}
