@@ -290,6 +290,16 @@ Hook in the admin org-change data step: end the user's link, cancel pending requ
 - [ ] Supervisor org change ends all supervisee links
 - [ ] All effects in one transaction
 
+**Notes carried from S6-01 (owner confirmed 2026-11-10)**
+
+S6-01 (migration `00007_supervision_notifications.sql`) enforces the organization rule only while a link is written, and S6-08 closes the remaining gap:
+
+- **The database does not stop an organization change on a live link.** The trigger `supervision_links_organization_trg` checks supervisee and supervisor against the link's `organization_id` only when a `pending` or `accepted` link is inserted or updated. Changing `users.organization_id` does not touch `supervision_links`, so it succeeds and leaves a live link across organizations unless this ticket ends it. The data step must therefore end or cancel every affected link in the same transaction as the organization update (already the third acceptance criterion). Consider a PostgreSQL test that a change leaves no `pending` or `accepted` link whose people differ from its `organization_id`.
+- **Take the user row lock before reading the links.** The trigger locks both user rows `FOR SHARE` when a request is created or accepted, so a concurrent request waits for an uncommitted organization change and then fails with `supervision_links_supervisor_organization_chk` or `supervision_links_supervisee_organization_chk`. The reverse needs care here: update (or `SELECT ... FOR UPDATE`) the user row first, then select and close the links. That way a link committed just before the lock is seen and closed, and a request arriving afterwards is refused by the trigger.
+- **Closing never needs the organization to match.** The trigger only runs when the new status is `pending` or `accepted`, so `cancelled` and `ended` updates succeed whichever organization the people are in now. `status = 'cancelled'` for a pending request has no `responded_at` or `ended_at`; an `ended` link keeps its `responded_at` and sets `ended_at` and optionally `ended_by` (the admin), per the named checks `supervision_links_responded_at_chk`, `supervision_links_ended_at_chk` and `supervision_links_ended_by_chk`.
+- **Supervisee side and supervisor side both apply.** A supervisor's organization change ends every `accepted` link and cancels every `pending` request addressed to them; a supervisee's organization change ends their `accepted` link or cancels their `pending` request.
+- **Notifications:** `notifications.type` is a dotted lowercase name chosen by the code (for example `supervision.ended`); no migration is needed for a new type. The payload is a JSON object of at most 8 KiB.
+
 **Definition of Done**
 
 - [ ] Implementation merged
