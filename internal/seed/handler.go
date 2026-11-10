@@ -87,19 +87,19 @@ func (h *Handler) dispatch(ctx context.Context, request Request) (Response, erro
 	invalid := domain.NewValidationError(domain.FieldError{Field: "operation", Message: "invalid operator request"})
 	switch request.Operation {
 	case "":
-		if request.ExpectedSubject != "" || request.VerificationEmail != "" || request.ApproveEmail != "" {
+		if request.hasOperationFields() {
 			return Response{}, invalid
 		}
 		result, err := h.runner.Run(ctx, request.Request)
 		return Response{Status: "ok", Result: result}, err
 	case "approve-entries":
-		if request.AllowProd || request.IncludeDevUsers || request.AdminEmail != "" || request.ExpectedSubject != "" || request.VerificationEmail != "" {
+		if request.hasSeedFields() || request.ExpectedSubject != "" || request.VerificationEmail != "" {
 			return Response{}, invalid
 		}
 		approved, err := h.runner.ApproveEntries(ctx, service.ApproveRequest{Email: request.ApproveEmail})
 		return Response{Status: "ok", Approved: &approved}, err
 	case "verify-binding":
-		if request.AllowProd || request.ApproveEmail != "" || request.IncludeDevUsers || request.AdminEmail != "" {
+		if request.hasSeedFields() || request.ApproveEmail != "" {
 			return Response{}, invalid
 		}
 		binding, err := h.runner.VerifyBinding(ctx, service.BindingRequest{Email: request.VerificationEmail, Subject: request.ExpectedSubject})
@@ -107,4 +107,14 @@ func (h *Handler) dispatch(ctx context.Context, request Request) (Response, erro
 	default:
 		return Response{}, invalid
 	}
+}
+
+// hasOperationFields reports fields that belong to a named operation, which the legacy seed event never carries.
+func (r Request) hasOperationFields() bool {
+	return r.ExpectedSubject != "" || r.VerificationEmail != "" || r.ApproveEmail != ""
+}
+
+// hasSeedFields reports fields that belong to the seed plan, which a named operation never carries.
+func (r Request) hasSeedFields() bool {
+	return r.AllowProd || r.IncludeDevUsers || r.AdminEmail != ""
 }
