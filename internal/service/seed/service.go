@@ -41,6 +41,7 @@ type Result struct {
 type Store interface {
 	Apply(context.Context, Plan) (Result, error)
 	VerifyBinding(context.Context, BindingRequest) (BindingResult, error)
+	ApproveEntries(context.Context, ApproveRequest, time.Time) (ApproveResult, error)
 }
 
 // Service validates operator input and enforces the dev/prod boundary.

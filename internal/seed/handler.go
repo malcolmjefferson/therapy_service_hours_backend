@@ -18,6 +18,7 @@ import (
 type Runner interface {
 	Run(context.Context, service.Request) (service.Result, error)
 	VerifyBinding(context.Context, service.BindingRequest) (service.BindingResult, error)
+	ApproveEntries(context.Context, service.ApproveRequest) (service.ApproveResult, error)
 }
 
 // Request preserves the existing seed event; verification is a separate operation.
@@ -26,6 +27,7 @@ type Request struct {
 	Operation         string `json:"operation,omitempty"`
 	VerificationEmail string `json:"verification_email,omitempty"`
 	ExpectedSubject   string `json:"expected_subject,omitempty"`
+	ApproveEmail      string `json:"approve_email,omitempty"`
 }
 
 // Response is safe to show in deployment logs and contains no identity or database attributes.
@@ -33,7 +35,8 @@ type Response struct {
 	Status string `json:"status"`
 	Code   string `json:"code,omitempty"`
 	service.Result
-	Binding *service.BindingResult `json:"binding,omitempty"`
+	Binding  *service.BindingResult `json:"binding,omitempty"`
+	Approved *service.ApproveResult `json:"approved,omitempty"`
 }
 
 // Handler adapts the trusted operator request to stable, non-sensitive results.
@@ -84,13 +87,19 @@ func (h *Handler) dispatch(ctx context.Context, request Request) (Response, erro
 	invalid := domain.NewValidationError(domain.FieldError{Field: "operation", Message: "invalid operator request"})
 	switch request.Operation {
 	case "":
-		if request.ExpectedSubject != "" || request.VerificationEmail != "" {
+		if request.ExpectedSubject != "" || request.VerificationEmail != "" || request.ApproveEmail != "" {
 			return Response{}, invalid
 		}
 		result, err := h.runner.Run(ctx, request.Request)
 		return Response{Status: "ok", Result: result}, err
+	case "approve-entries":
+		if request.AllowProd || request.IncludeDevUsers || request.AdminEmail != "" || request.ExpectedSubject != "" || request.VerificationEmail != "" {
+			return Response{}, invalid
+		}
+		approved, err := h.runner.ApproveEntries(ctx, service.ApproveRequest{Email: request.ApproveEmail})
+		return Response{Status: "ok", Approved: &approved}, err
 	case "verify-binding":
-		if request.AllowProd || request.IncludeDevUsers || request.AdminEmail != "" {
+		if request.AllowProd || request.ApproveEmail != "" || request.IncludeDevUsers || request.AdminEmail != "" {
 			return Response{}, invalid
 		}
 		binding, err := h.runner.VerifyBinding(ctx, service.BindingRequest{Email: request.VerificationEmail, Subject: request.ExpectedSubject})

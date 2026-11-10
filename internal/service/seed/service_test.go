@@ -14,12 +14,22 @@ type store struct {
 	calls int
 	plan  seed.Plan
 	err   error
+
+	approved   seed.ApproveRequest
+	approvedAt time.Time
 }
 
 func (s *store) Apply(_ context.Context, plan seed.Plan) (seed.Result, error) {
 	s.calls++
 	s.plan = plan
 	return seed.Result{AccountsCreated: int64(len(plan.Accounts))}, s.err
+}
+
+func (s *store) ApproveEntries(_ context.Context, request seed.ApproveRequest, at time.Time) (seed.ApproveResult, error) {
+	s.calls++
+	s.approved = request
+	s.approvedAt = at
+	return seed.ApproveResult{EntriesApproved: 2}, s.err
 }
 
 func (s *store) VerifyBinding(_ context.Context, _ seed.BindingRequest) (seed.BindingResult, error) {

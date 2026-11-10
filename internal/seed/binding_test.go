@@ -13,7 +13,12 @@ import (
 	service "github.com/malcolmjefferson/therapy_service_hours_backend/internal/service/seed"
 )
 
-type bindingRunner struct{ reads, writes int }
+type bindingRunner struct{ reads, writes, approvals int }
+
+func (r *bindingRunner) ApproveEntries(context.Context, service.ApproveRequest) (service.ApproveResult, error) {
+	r.approvals++
+	return service.ApproveResult{EntriesApproved: 3}, nil
+}
 
 func (r *bindingRunner) Run(context.Context, service.Request) (service.Result, error) {
 	r.writes++
@@ -73,6 +78,29 @@ func TestBindingTransportNeverExposesInputsOrRawErrors(t *testing.T) {
 		}
 		if storeError != nil && (response.Status != "error" || response.Code != "SEED_UNAVAILABLE" || response.Binding != nil) {
 			t.Fatal("failed verification exposed partial data")
+		}
+	}
+}
+
+func TestApproveOperationIsSeparateAndRefusesMixedFields(t *testing.T) {
+	r := &bindingRunner{}
+	h, _ := transport.New(r, slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)))
+	response, _ := h.Handle(t.Context(), transport.Request{Operation: "approve-entries", ApproveEmail: "test-invited@example.invalid"})
+	if response.Status != "ok" || response.Approved == nil || response.Approved.EntriesApproved != 3 || r.approvals != 1 || r.reads != 0 || r.writes != 0 {
+		t.Fatal("approval did not dispatch alone")
+	}
+	for _, request := range []transport.Request{
+		{ApproveEmail: "test-invited@example.invalid"},
+		{Operation: "approve-entries", Request: service.Request{AllowProd: true}},
+		{Operation: "approve-entries", Request: service.Request{IncludeDevUsers: true}},
+		{Operation: "approve-entries", Request: service.Request{AdminEmail: "admin@example.test"}},
+		{Operation: "approve-entries", ExpectedSubject: "s"},
+		{Operation: "approve-entries", VerificationEmail: "a@example.test"},
+		{Operation: "verify-binding", ApproveEmail: "test-invited@example.invalid", VerificationEmail: "a@example.test", ExpectedSubject: "s"},
+	} {
+		response, _ = h.Handle(t.Context(), request)
+		if response.Code != "INVALID_SEED_REQUEST" || response.Approved != nil || r.approvals != 1 || r.reads != 0 {
+			t.Fatalf("invalid operation reached storage: %+v", request)
 		}
 	}
 }

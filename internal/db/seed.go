@@ -39,6 +39,15 @@ func (s *SeedStore) VerifyBinding(ctx context.Context, request seed.BindingReque
 	return seed.BindingResult{Users: row.Users, SubjectUsers: row.SubjectUsers, MatchingActiveAdmin: row.MatchingActiveAdmin, AcceptedInvitations: row.AcceptedInvitations}, nil
 }
 
+// ApproveEntries approves one synthetic test user's pending entries in a single statement (S3-07).
+func (s *SeedStore) ApproveEntries(ctx context.Context, request seed.ApproveRequest, at time.Time) (seed.ApproveResult, error) {
+	count, err := identityqueries.New(s.pool).ApproveSeedEntries(ctx, identityqueries.ApproveSeedEntriesParams{Email: request.Email, At: pgtype.Timestamptz{Time: at, Valid: true}})
+	if err != nil {
+		return seed.ApproveResult{}, fmt.Errorf("approve seed entries: %w", err)
+	}
+	return seed.ApproveResult{EntriesApproved: count}, nil
+}
+
 // Apply is serialized and atomic, including expired invitation renewal. Existing bound users,
 // deactivation, organization and role assignments are never overwritten by this bootstrap.
 func (s *SeedStore) Apply(ctx context.Context, plan seed.Plan) (seed.Result, error) {
