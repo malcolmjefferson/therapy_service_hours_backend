@@ -57,6 +57,17 @@ type EntryClient struct {
 	UserID   pgtype.UUID
 }
 
+type EntryStatusHistory struct {
+	ID            pgtype.UUID
+	EntryID       pgtype.UUID
+	FromStatus    string
+	ToStatus      string
+	ChangedBy     pgtype.UUID
+	ChangedByName string
+	Reason        pgtype.Text
+	ChangedAt     pgtype.Timestamptz
+}
+
 type Goal struct {
 	ID                    pgtype.UUID
 	UserID                pgtype.UUID
