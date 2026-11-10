@@ -36,7 +36,7 @@ func TestApprovedEntry_DirectUpdateAndDeleteFail(t *testing.T) {
 
 	for name, sql := range map[string]string{
 		"edit notes":          `UPDATE entries SET notes = 'changed' WHERE id = $1::uuid`,
-		"edit on_site":       `UPDATE entries SET on_site = true WHERE id = $1::uuid`,
+		"edit on_site":        `UPDATE entries SET on_site = true WHERE id = $1::uuid`,
 		"touch updated_at":    `UPDATE entries SET updated_at = now() WHERE id = $1::uuid`,
 		"revert without path": `UPDATE entries SET status = 'pending' WHERE id = $1::uuid`,
 		"reject":              `UPDATE entries SET status = 'rejected' WHERE id = $1::uuid`,
