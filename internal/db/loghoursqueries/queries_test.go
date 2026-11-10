@@ -91,7 +91,23 @@ func (f *fixture) client(t *testing.T, user pgtype.UUID, name string) lq.Client 
 
 func (f *fixture) setStatus(t *testing.T, id pgtype.UUID, status string) {
 	t.Helper()
-	if _, err := f.conn.Exec(f.ctx, `UPDATE entries SET status = $2 WHERE id = $1`, id, status); err != nil {
+	// An approved entry can only leave that status through the revert path (S7-01), so the fixture
+	// names the entry the way the revert service will, then lands on the requested status.
+	tx, err := f.conn.Begin(f.ctx)
+	if err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+	defer func() { _ = tx.Rollback(f.ctx) }()
+	if _, err := tx.Exec(f.ctx, `SELECT set_config('app.reverting_entry', $1::uuid::text, true)`, id); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+	if _, err := tx.Exec(f.ctx, `UPDATE entries SET status = 'pending' WHERE id = $1 AND status = 'approved'`, id); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+	if _, err := tx.Exec(f.ctx, `UPDATE entries SET status = $2 WHERE id = $1`, id, status); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+	if err := tx.Commit(f.ctx); err != nil {
 		t.Fatalf("set status: %v", err)
 	}
 }
