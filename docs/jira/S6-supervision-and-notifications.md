@@ -292,7 +292,7 @@ Hook in the admin org-change data step: end the user's link, cancel pending requ
 
 **Notes carried from S6-01 (owner confirmed 2026-11-10)**
 
-S6-01 (migration `00007_supervision_notifications.sql`) enforces the organization rule only while a link is written, and S6-08 closes the remaining gap:
+S6-01 (migration `00008_supervision_notifications.sql`) enforces the organization rule only while a link is written, and S6-08 closes the remaining gap:
 
 - **The database does not stop an organization change on a live link.** The trigger `supervision_links_organization_trg` checks supervisee and supervisor against the link's `organization_id` only when a `pending` or `accepted` link is inserted or updated. Changing `users.organization_id` does not touch `supervision_links`, so it succeeds and leaves a live link across organizations unless this ticket ends it. The data step must therefore end or cancel every affected link in the same transaction as the organization update (already the third acceptance criterion). Consider a PostgreSQL test that a change leaves no `pending` or `accepted` link whose people differ from its `organization_id`.
 - **Take the user row lock before reading the links.** The trigger locks both user rows `FOR SHARE` when a request is created or accepted, so a concurrent request waits for an uncommitted organization change and then fails with `supervision_links_supervisor_organization_chk` or `supervision_links_supervisee_organization_chk`. The reverse needs care here: update (or `SELECT ... FOR UPDATE`) the user row first, then select and close the links. That way a link committed just before the lock is seen and closed, and a request arriving afterwards is refused by the trigger.
