@@ -320,7 +320,7 @@ func TestCorpus_CraftedRowsAreImportedLiterally(t *testing.T) {
 
 	// The shared date, category and length do not make a row a duplicate of another: `100%` and `100x`,
 	// `a_c` and `abc`, `%` and every other note stay distinct, so nothing is matched as a pattern.
-	wantAllImported(t, report, len(crafted), 0)
+	wantAllImported(t, report, len(crafted), len(crafted))
 	a.wantStoredOnce(me.ID, true, crafted)
 	a.wantStoredOnce(me.ID, false, craftedClients)
 	// `_` and `%` in a name make no other client the same one.
