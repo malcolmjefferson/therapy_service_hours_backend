@@ -131,14 +131,14 @@ func TestUpdateGoalTarget_SetsTheTargetForTheNamedGoal(t *testing.T) {
 func TestUpdateGoalTarget_RefusesBadRequestsBeforeTheService(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct{ path, body string }{
-		"zero":            {"/api/v1/goals/direct", `{"target_hours": 0}`},
-		"negative":        {"/api/v1/goals/direct", `{"target_hours": -3}`},
-		"fraction":        {"/api/v1/goals/direct", `{"target_hours": 10.5}`},
-		"string":          {"/api/v1/goals/direct", `{"target_hours": "10"}`},
-		"null":            {"/api/v1/goals/direct", `{"target_hours": null}`},
-		"too large":       {"/api/v1/goals/direct", `{"target_hours": 100001}`},
-		"missing":         {"/api/v1/goals/direct", `{}`},
-		"unknown field":   {"/api/v1/goals/direct", `{"target_hours": 10, "last_celebrated_percent": 100}`},
+		"zero":          {"/api/v1/goals/direct", `{"target_hours": 0}`},
+		"negative":      {"/api/v1/goals/direct", `{"target_hours": -3}`},
+		"fraction":      {"/api/v1/goals/direct", `{"target_hours": 10.5}`},
+		"string":        {"/api/v1/goals/direct", `{"target_hours": "10"}`},
+		"null":          {"/api/v1/goals/direct", `{"target_hours": null}`},
+		"too large":     {"/api/v1/goals/direct", `{"target_hours": 100001}`},
+		"missing":       {"/api/v1/goals/direct", `{}`},
+		"unknown field": {"/api/v1/goals/direct", `{"target_hours": 10, "last_celebrated_percent": 100}`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

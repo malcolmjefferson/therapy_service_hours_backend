@@ -83,45 +83,68 @@ func TestEveryOperationRequiresAnActiveActor(t *testing.T) {
 	}
 }
 
-func TestProgress_ReturnsTheFourGoalsInDisplayOrderWithHoursPercentsAndSplit(t *testing.T) {
+// wantCard checks a card's type, target, hours and percents; a nil percent means "no target".
+func wantCard(t *testing.T, c goals.Card, typ domain.GoalType, target *int32, approved, pending float64, approvedPct *int32) {
+	t.Helper()
+	if c.Type != typ || c.Hours.Approved != approved || c.Hours.Pending != pending {
+		t.Errorf("%s card = %+v, want hours %v / %v", typ, c, approved, pending)
+	}
+	if (c.TargetHours == nil) != (target == nil) || (target != nil && *c.TargetHours != *target) {
+		t.Errorf("%s target = %v, want %v", typ, c.TargetHours, target)
+	}
+	if (c.ApprovedPercent == nil) != (approvedPct == nil) || (approvedPct != nil && *c.ApprovedPercent != *approvedPct) {
+		t.Errorf("%s approved percent = %v, want %v", typ, c.ApprovedPercent, approvedPct)
+	}
+	if (c.PendingPercent == nil) != (approvedPct == nil) {
+		t.Errorf("%s pending percent = %v, nil only without a target", typ, c.PendingPercent)
+	}
+}
+
+func TestProgress_ReturnsTheFourGoalsInDisplayOrderWithHoursAndPercents(t *testing.T) {
 	t.Parallel()
 	store := &fakeStore{rows: defaults(), minutes: domain.ProgressMinutes{
-		Direct:                domain.Minutes{Approved: 1500, Pending: 75}, // 25 h, 1.25 h of 1200 h
-		Supervision:           domain.Minutes{Approved: 135, Pending: 75},
+		Direct:        domain.Minutes{Approved: 1500, Pending: 75}, // 25 h, 1.25 h of 1200 h
+		Supervision:   domain.Minutes{Approved: 135, Pending: 75},
+		TotalActivity: domain.Minutes{Approved: 1635, Pending: 150},
+		OnSite:        domain.Minutes{Approved: 120, Pending: 75},
+	}}
+	cards, err := newService(t, store).Progress(t.Context(), active)
+	if err != nil || len(cards) != 4 {
+		t.Fatalf("cards = %+v, %v", cards, err)
+	}
+	wantCard(t, cards[0], domain.GoalDirect, i32(1200), 25, 1.25, i32(2))
+	wantCard(t, cards[1], domain.GoalSupervision, i32(100), 2.25, 1.25, i32(2))
+	wantCard(t, cards[2], domain.GoalTotalActivity, i32(3000), 27.25, 2.5, i32(0))
+	wantCard(t, cards[3], domain.GoalOnSite, nil, 2, 1.25, nil)
+	if cards[1].LastCelebratedPercent != 25 {
+		t.Errorf("last celebrated = %d, want 25", cards[1].LastCelebratedPercent)
+	}
+	if store.calls != 1 {
+		t.Errorf("store calls = %d, want 1 (no N+1)", store.calls)
+	}
+}
+
+func TestProgress_OnlyTheSupervisionCardCarriesTheGroupIndividualSplit(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{rows: defaults(), minutes: domain.ProgressMinutes{
 		SupervisionGroup:      domain.Minutes{Approved: 75, Pending: 30},
 		SupervisionIndividual: domain.Minutes{Approved: 60, Pending: 45},
-		TotalActivity:         domain.Minutes{Approved: 1635, Pending: 150},
-		OnSite:                domain.Minutes{Approved: 120, Pending: 75},
 	}}
 	cards, err := newService(t, store).Progress(t.Context(), active)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cards) != 4 || cards[0].Type != domain.GoalDirect || cards[1].Type != domain.GoalSupervision || cards[2].Type != domain.GoalTotalActivity || cards[3].Type != domain.GoalOnSite {
-		t.Fatalf("order = %+v", cards)
-	}
-	direct := cards[0]
-	if direct.Hours.Approved != 25 || direct.Hours.Pending != 1.25 || *direct.ApprovedPercent != 2 || *direct.PendingPercent != 0 || *direct.TargetHours != 1200 {
-		t.Errorf("direct = %+v", direct)
-	}
 	sup := cards[1]
-	if sup.Hours.Approved != 2.25 || sup.Hours.Pending != 1.25 || sup.LastCelebratedPercent != 25 {
-		t.Errorf("supervision = %+v", sup)
+	if sup.SupervisionGroup == nil || sup.SupervisionIndividual == nil {
+		t.Fatal("supervision card has no split")
 	}
-	if sup.SupervisionGroup == nil || sup.SupervisionIndividual == nil ||
-		sup.SupervisionGroup.Approved != 1.25 || sup.SupervisionGroup.Pending != 0.5 ||
-		sup.SupervisionIndividual.Approved != 1 || sup.SupervisionIndividual.Pending != 0.75 {
+	if *sup.SupervisionGroup != (goals.HourTotals{Approved: 1.25, Pending: 0.5}) || *sup.SupervisionIndividual != (goals.HourTotals{Approved: 1, Pending: 0.75}) {
 		t.Errorf("split = %+v / %+v", sup.SupervisionGroup, sup.SupervisionIndividual)
 	}
-	if cards[0].SupervisionGroup != nil || cards[2].SupervisionGroup != nil || cards[3].SupervisionGroup != nil {
-		t.Error("only the supervision goal carries the split")
-	}
-	onSite := cards[3]
-	if onSite.TargetHours != nil || onSite.ApprovedPercent != nil || onSite.PendingPercent != nil || onSite.Hours.Approved != 2 || onSite.Hours.Pending != 1.25 {
-		t.Errorf("on-site = %+v", onSite)
-	}
-	if store.calls != 1 {
-		t.Errorf("store calls = %d, want 1 (no N+1)", store.calls)
+	for _, i := range []int{0, 2, 3} {
+		if cards[i].SupervisionGroup != nil || cards[i].SupervisionIndividual != nil {
+			t.Errorf("%s carries a split", cards[i].Type)
+		}
 	}
 }
 

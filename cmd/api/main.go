@@ -95,19 +95,24 @@ func run() error {
 	}
 
 	if cfg.LocalHTTPAddr != "" {
-		logger.Info("serving local HTTP", slog.String("addr", cfg.LocalHTTPAddr), slog.String("version", cfg.Version))
-		srv := &http.Server{
-			Addr:              cfg.LocalHTTPAddr,
-			Handler:           router,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return err //nolint:wrapcheck // Local development only.
-		}
-		return nil
+		return serveLocal(logger, cfg, router)
 	}
 
 	logger.Info("starting Lambda handler", slog.String("version", cfg.Version))
 	lambda.Start(apigw.Handler(router, httpapi.ContextWithRequestID))
+	return nil
+}
+
+// serveLocal runs the API on a plain HTTP port for local development only.
+func serveLocal(logger *slog.Logger, cfg config.Config, router http.Handler) error {
+	logger.Info("serving local HTTP", slog.String("addr", cfg.LocalHTTPAddr), slog.String("version", cfg.Version))
+	srv := &http.Server{
+		Addr:              cfg.LocalHTTPAddr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err //nolint:wrapcheck // Local development only.
+	}
 	return nil
 }

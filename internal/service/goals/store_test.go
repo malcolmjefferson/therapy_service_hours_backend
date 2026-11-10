@@ -90,9 +90,7 @@ func targetOf(t *testing.T, cards []goals.Card, g domain.GoalType) *int32 {
 	return nil
 }
 
-func TestStore_ProgressMatchesTheHandComputedFixtureAndDefaults(t *testing.T) {
-	e := newEnv(t)
-	me := e.user("progress-a@example.test")
+func (e *env) seedFixture(me domain.Actor) {
 	e.entry(me, 1, "approved", 90, true)   // Individual Counseling, direct
 	e.entry(me, 2, "approved", 60, false)  // Group Facilitation, direct
 	e.entry(me, 1, "pending", 45, true)    // direct
@@ -101,31 +99,27 @@ func TestStore_ProgressMatchesTheHandComputedFixtureAndDefaults(t *testing.T) {
 	e.entry(me, 12, "approved", 60, false) // Individual Supervision
 	e.entry(me, 12, "pending", 45, false)  // Individual Supervision
 	e.entry(me, 6, "approved", 30, true)   // Writing Progress Notes, indirect
+}
+
+func TestStore_ProgressMatchesTheHandComputedFixtureAndDefaults(t *testing.T) {
+	e := newEnv(t)
+	me := e.user("progress-a@example.test")
+	e.seedFixture(me)
 	cards, err := e.svc.Progress(t.Context(), me)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(cards) != 4 {
-		t.Fatalf("cards = %+v", cards)
+	if err != nil || len(cards) != 4 {
+		t.Fatalf("cards = %+v, %v", cards, err)
 	}
 	// Direct: approved 150 min = 2.5 h, pending 45 min = 0.75 h, of 1200 h.
-	d := cards[0]
-	if *d.TargetHours != 1200 || d.Hours.Approved != 2.5 || d.Hours.Pending != 0.75 || *d.ApprovedPercent != 0 {
-		t.Errorf("direct = %+v", d)
-	}
-	// Supervision: approved 135 min = 2.25 h (group 1.25 + individual 1), pending 45 min = 0.75 h, of 100 h.
-	s := cards[1]
-	if *s.TargetHours != 100 || s.Hours.Approved != 2.25 || s.Hours.Pending != 0.75 || *s.ApprovedPercent != 2 ||
-		s.SupervisionGroup.Approved != 1.25 || s.SupervisionIndividual.Approved != 1 || s.SupervisionIndividual.Pending != 0.75 {
-		t.Errorf("supervision = %+v / %+v / %+v", s, s.SupervisionGroup, s.SupervisionIndividual)
-	}
+	wantCard(t, cards[0], domain.GoalDirect, i32(1200), 2.5, 0.75, i32(0))
+	// Supervision: approved 135 min = 2.25 h, pending 45 min = 0.75 h, of 100 h.
+	wantCard(t, cards[1], domain.GoalSupervision, i32(100), 2.25, 0.75, i32(2))
 	// Total: approved 90+60+75+60+30 = 315 min = 5.25 h; pending 90 min = 1.5 h.
-	if a := cards[2]; *a.TargetHours != 3000 || a.Hours.Approved != 5.25 || a.Hours.Pending != 0.75+0.75 {
-		t.Errorf("total = %+v", a)
-	}
+	wantCard(t, cards[2], domain.GoalTotalActivity, i32(3000), 5.25, 1.5, i32(0))
 	// On-site: approved 90+30 = 120 min = 2 h; pending 45 min = 0.75 h; no target.
-	if o := cards[3]; o.TargetHours != nil || o.Hours.Approved != 2 || o.Hours.Pending != 0.75 {
-		t.Errorf("on-site = %+v", o)
+	wantCard(t, cards[3], domain.GoalOnSite, nil, 2, 0.75, nil)
+	// The split: group 75 / 0 min, individual 60 / 45 min.
+	if g, i := cards[1].SupervisionGroup, cards[1].SupervisionIndividual; g.Approved != 1.25 || g.Pending != 0 || i.Approved != 1 || i.Pending != 0.75 {
+		t.Errorf("split = %+v / %+v", g, i)
 	}
 }
 

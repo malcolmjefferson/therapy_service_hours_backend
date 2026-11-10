@@ -1,5 +1,7 @@
 package goals
 
+import "math"
+
 // The goal math is pure so it can be tested without storage (S3-04). Entry durations are whole
 // minutes (CLAUDE.md §7.1); targets are whole hours (§9).
 
@@ -24,5 +26,9 @@ func Percent(minutes int64, targetHours int32) int32 {
 	if minutes <= 0 || targetHours <= 0 {
 		return 0
 	}
-	return int32(minutes * 100 / (int64(targetHours) * minutesPerHour))
+	percent := minutes * 100 / (int64(targetHours) * minutesPerHour)
+	if percent > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(percent) //nolint:gosec // G115: bounded by the check above.
 }
