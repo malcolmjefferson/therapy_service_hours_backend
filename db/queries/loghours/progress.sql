@@ -1,0 +1,33 @@
+-- S3-02: goal progress (CLAUDE.md §7.2, FR-GOAL-01, FR-GOAL-03, FR-GOAL-05). Static SQL only (SEC-20, SEC-21);
+-- the statement carries the owner's user_id (GO-47).
+
+-- name: GetProgressMinutes :one
+-- Every number a goal card needs, in one read of the user's entries (no N+1, however many goals).
+-- Minutes, not hours: the service converts once for display (CLAUDE.md §7.1).
+--   approved_*  drive the bar; pending_* are the lighter segment; rejected entries are never read.
+--   direct_*          category group direct
+--   supervision_*     category group supervision, which is group + individual combined
+--   supervision_group_* / supervision_individual_*  the split on the Supervision card (FR-GOAL-05),
+--                     matched on the two seeded category names (categories.name is unique)
+--   total_activity_*  all categories
+--   on_site_*         entries with on_site = true, any category
+-- A plain aggregate always returns one row, so a user with no entries gets zeros. Legacy "Needs time"
+-- entries count: they keep their duration. Reads (user_id, status) via entries_user_id_status_idx; the
+-- migration test reviews the plan.
+SELECT
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'approved' AND c.category_group = 'direct'), 0)::bigint AS direct_approved_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'pending' AND c.category_group = 'direct'), 0)::bigint AS direct_pending_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'approved' AND c.category_group = 'supervision'), 0)::bigint AS supervision_approved_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'pending' AND c.category_group = 'supervision'), 0)::bigint AS supervision_pending_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'approved' AND c.name = 'Group Supervision'), 0)::bigint AS supervision_group_approved_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'pending' AND c.name = 'Group Supervision'), 0)::bigint AS supervision_group_pending_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'approved' AND c.name = 'Individual Supervision'), 0)::bigint AS supervision_individual_approved_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'pending' AND c.name = 'Individual Supervision'), 0)::bigint AS supervision_individual_pending_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'approved'), 0)::bigint AS total_activity_approved_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'pending'), 0)::bigint AS total_activity_pending_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'approved' AND e.on_site), 0)::bigint AS on_site_approved_minutes,
+    COALESCE(SUM(e.duration_minutes) FILTER (WHERE e.status = 'pending' AND e.on_site), 0)::bigint AS on_site_pending_minutes
+FROM entries e
+JOIN categories c ON c.id = e.category_id
+WHERE e.user_id = sqlc.arg(user_id)
+  AND e.status IN ('approved', 'pending');
