@@ -43,11 +43,11 @@ func TestRun_AppliesTheMigrationsThenIsANoOp(t *testing.T) {
 	conn := open(t, database)
 
 	first := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{})
-	if first.Status != migrate.StatusOK || !slices.Equal(first.Applied, []int64{1, 2, 3, 4, 5, 6}) || first.Version != 6 {
+	if first.Status != migrate.StatusOK || !slices.Equal(first.Applied, []int64{1, 2, 3, 4, 5, 6, 7, 8}) || first.Version != 8 {
 		t.Fatalf("first run = %+v", first)
 	}
 	second := migrate.Run(t.Context(), conn, migrations.FS, migrate.Options{})
-	if second.Status != migrate.StatusOK || len(second.Applied) != 0 || second.Version != 6 {
+	if second.Status != migrate.StatusOK || len(second.Applied) != 0 || second.Version != 8 {
 		t.Fatalf("second run should be a no-op, got %+v", second)
 	}
 
@@ -85,7 +85,7 @@ func TestRun_WaitsForTheAdvisoryLock(t *testing.T) {
 	}
 	select {
 	case res := <-done:
-		if res.Status != migrate.StatusOK || len(res.Applied) != 6 {
+		if res.Status != migrate.StatusOK || len(res.Applied) != 8 {
 			t.Errorf("run after the lock was released = %+v", res)
 		}
 	case <-time.After(15 * time.Second):
@@ -110,13 +110,13 @@ func TestRun_ConcurrentRunsApplyEachMigrationOnce(t *testing.T) {
 
 	applied := 0
 	for _, r := range results {
-		if r.Status != migrate.StatusOK || r.Version != 6 {
+		if r.Status != migrate.StatusOK || r.Version != 8 {
 			t.Errorf("run = %+v", r)
 		}
 		applied += len(r.Applied)
 	}
-	if applied != 6 {
-		t.Errorf("migrations applied %d times across both runs, want exactly 6", applied)
+	if applied != 8 {
+		t.Errorf("migrations applied %d times across both runs, want exactly 8", applied)
 	}
 }
 

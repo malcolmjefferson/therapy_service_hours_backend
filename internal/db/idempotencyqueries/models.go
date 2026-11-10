@@ -90,10 +90,31 @@ type Invitation struct {
 	AcceptedAt     pgtype.Timestamptz
 }
 
+type Notification struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	Type      string
+	Payload   []byte
+	ReadAt    pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type Organization struct {
 	ID        pgtype.UUID
 	Name      string
 	CreatedAt pgtype.Timestamptz
+}
+
+type SupervisionLink struct {
+	ID             pgtype.UUID
+	SuperviseeID   pgtype.UUID
+	SupervisorID   pgtype.UUID
+	OrganizationID pgtype.UUID
+	Status         string
+	RequestedAt    pgtype.Timestamptz
+	RespondedAt    pgtype.Timestamptz
+	EndedAt        pgtype.Timestamptz
+	EndedBy        pgtype.UUID
 }
 
 type User struct {
