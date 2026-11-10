@@ -24,6 +24,8 @@ const (
 	ProblemEntryOverlap     ProblemType = "urn:therapy-service-hours:problem:entry-overlap"
 	ProblemEntryLocked      ProblemType = "urn:therapy-service-hours:problem:entry-locked"
 
+	ProblemImportTooManyRows ProblemType = "urn:therapy-service-hours:problem:import-too-many-rows"
+
 	ProblemIdempotencyKeyReused  ProblemType = "urn:therapy-service-hours:problem:idempotency-key-reused"
 	ProblemIdempotencyInProgress ProblemType = "urn:therapy-service-hours:problem:idempotency-key-in-progress"
 )

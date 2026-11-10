@@ -110,11 +110,11 @@ func (t *fakeTx) EntriesBetween(_ context.Context, first, last time.Time) ([]imp
 	return out, nil
 }
 
-func (t *fakeTx) CreateEntry(_ context.Context, e importexport.NewEntry) error {
+func (t *fakeTx) CreateEntries(_ context.Context, entries []importexport.NewEntry) error {
 	if t.store.failOn == "create" {
 		return t.store.failErr
 	}
-	t.entries = append(t.entries, e)
+	t.entries = append(t.entries, entries...)
 	return nil
 }
 

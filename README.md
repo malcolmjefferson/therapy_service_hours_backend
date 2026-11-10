@@ -268,6 +268,34 @@ same VPC, subnet, security group and `DB_*` settings as `cmd/seed`; those live i
 Verify with `go test -race ./internal/http ./internal/service/entries ./cmd/idempotency-purge` (the
 PostgreSQL tests need Docker).
 
+## Import endpoint (S4-04)
+
+`POST /api/v1/import/markdown` imports the prototype's Markdown ledger as the caller's own entries and
+clients (the import rules are CLAUDE.md §12.3). The handler is `internal/http/import.go`; the parsing,
+merging and duplicate rules are `internal/service/importexport` (S4-02, S4-03).
+
+| Rule | Behavior |
+|---|---|
+| Body | `multipart/form-data` with exactly one part, `file`. Any other part is `400` naming the part; a body that is not multipart is `400`. |
+| File type | The part's content type must be `text/markdown` or `text/plain` (parameters and case are ignored; a part with no content type counts as `text/plain`). Anything else is `400`. A file that is not UTF-8 text, or has no entries table, is also `400`, whatever its content type says. |
+| Size | A file over 1 MiB (1,048,576 bytes) is `413` `body-too-large`; exactly 1 MiB is accepted. This route alone reads up to 1 MiB plus 64 KiB of multipart framing (`maxImportBodyBytes`); every other route keeps `MAX_BODY_BYTES`. |
+| Rows | More than 5,000 rows in the entries table is `413` `import-too-many-rows`. Nothing is stored for a refused file. |
+| Ownership | Only the caller's own ledger is read or written; the service takes the actor, never an id from the request. An admin or supervisor has no wider reach. |
+| `Idempotency-Key` | Required. A retry with the same key and the same file replays the stored report (`Idempotency-Replayed: true`) and imports nothing again. The retry is matched on the file's content, not its bytes, because a client picks a new multipart boundary per attempt (`multipartDigest`). The same key with a different file is `409` `idempotency-key-reused`. Errors are not stored. A new key with the same file imports nothing and reports every row as `duplicate`. |
+| Cell content | Cells are parsed to typed values and stored through parameterized queries as plain text. A cell such as `=HYPERLINK(...)`, `'; DROP TABLE ...` or `<script>` is stored exactly as written and returned as an escaped JSON string; the report never quotes a cell. |
+
+**Timeout (checked for a 5,000-row file).** The API Lambda has a 15-second timeout (infra
+`lib/app/api.ts`; API Gateway stops at 30 s), and `resolveActor` gives each request a 12-second context.
+S4-03 inserted one entry per round trip (about 10,000 statements for 5,000 rows with two clients each).
+Measured against PostgreSQL, a 5,000-row, 820 KB file took 3.1 s with no network latency and 16.7 s with 1 ms
+added per round trip, so it would have timed out on RDS. `importTx.CreateEntries` now stores all accepted
+rows with two statements (`InsertImportedEntries`, `InsertImportedEntryClients`, `unnest` over parallel
+arrays with ids chosen in Go), so the time no longer grows with latency: 0.41 s at 0 ms and 0.53 s at 2 ms
+per round trip, plus parsing. Nothing in the infra repo needs to change. `TestEndpoint_ImportsFiveThousandRowsQuickly`
+fails if the import takes more than 8 s.
+
+Verify with `go test -race ./internal/http ./internal/service/importexport` (the PostgreSQL tests need Docker).
+
 ## Identity seed Lambda (S1-09)
 
 `cmd/seed` is invoked through IAM, with no public HTTP route. It connects as `app_rw` using

@@ -34,6 +34,79 @@ func (q *Queries) InsertClientIfAbsent(ctx context.Context, arg InsertClientIfAb
 	return i, err
 }
 
+const insertImportedEntries = `-- name: InsertImportedEntries :exec
+INSERT INTO entries (id, user_id, session_date, start_time, end_time, duration_minutes, category_id, on_site, notes, needs_time)
+SELECT r.id, $1::uuid, r.session_date, r.start_time, r.end_time, r.duration_minutes, r.category_id, r.on_site,
+       NULLIF(r.notes, ''), r.start_time IS NULL
+FROM (
+    SELECT
+        unnest($2::uuid[]) AS id,
+        unnest($3::date[]) AS session_date,
+        unnest($4::time[]) AS start_time,
+        unnest($5::time[]) AS end_time,
+        unnest($6::int[]) AS duration_minutes,
+        unnest($7::uuid[]) AS category_id,
+        unnest($8::boolean[]) AS on_site,
+        unnest($9::text[]) AS notes
+) AS r
+`
+
+type InsertImportedEntriesParams struct {
+	UserID          pgtype.UUID
+	Ids             []pgtype.UUID
+	SessionDates    []pgtype.Date
+	StartTimes      []pgtype.Time
+	EndTimes        []pgtype.Time
+	DurationMinutes []int32
+	CategoryIds     []pgtype.UUID
+	OnSites         []bool
+	Notes           []string
+}
+
+// Stores a whole file's accepted rows in one statement: one round trip instead of one per row, which
+// is what keeps a 5,000-row import inside the API Lambda's timeout (S4-04). The arrays are parallel,
+// one element per entry, and the ids are chosen by the caller so InsertImportedEntryClients can name
+// them. Every entry is the caller's own, pending, with needs_time derived from the start time exactly
+// as InsertEntry does. A session that overlaps another non-rejected one (a request that committed after
+// the service read the days) raises entries_no_overlap_excl (23P01) and nothing is stored. An empty
+// notes element means no notes.
+func (q *Queries) InsertImportedEntries(ctx context.Context, arg InsertImportedEntriesParams) error {
+	_, err := q.db.Exec(ctx, insertImportedEntries,
+		arg.UserID,
+		arg.Ids,
+		arg.SessionDates,
+		arg.StartTimes,
+		arg.EndTimes,
+		arg.DurationMinutes,
+		arg.CategoryIds,
+		arg.OnSites,
+		arg.Notes,
+	)
+	return err
+}
+
+const insertImportedEntryClients = `-- name: InsertImportedEntryClients :exec
+INSERT INTO entry_clients (entry_id, client_id, user_id)
+SELECT DISTINCT l.entry_id, l.client_id, $1::uuid
+FROM (
+    SELECT unnest($2::uuid[]) AS entry_id, unnest($3::uuid[]) AS client_id
+) AS l
+`
+
+type InsertImportedEntryClientsParams struct {
+	UserID    pgtype.UUID
+	EntryIds  []pgtype.UUID
+	ClientIds []pgtype.UUID
+}
+
+// Attaches clients to the entries InsertImportedEntries stored, one (entry, client) pair per element
+// of the parallel arrays. The composite foreign keys reject a client that belongs to another user
+// (23503); DISTINCT makes a repeated pair harmless.
+func (q *Queries) InsertImportedEntryClients(ctx context.Context, arg InsertImportedEntryClientsParams) error {
+	_, err := q.db.Exec(ctx, insertImportedEntryClients, arg.UserID, arg.EntryIds, arg.ClientIds)
+	return err
+}
+
 const listEntriesForImport = `-- name: ListEntriesForImport :many
 SELECT
     e.id,

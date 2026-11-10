@@ -332,9 +332,9 @@ func TestStore_FailureRollsBackEverything(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err := tx.CreateEntry(ctx, importexport.NewEntry{
+		if err := tx.CreateEntries(ctx, []importexport.NewEntry{{
 			SessionDate: day("2026-01-05"), DurationMinutes: 60, CategoryID: cats[0].ID, ClientIDs: []string{m.Client.ID},
-		}); err != nil {
+		}}); err != nil {
 			return err
 		}
 		return boom
@@ -359,9 +359,9 @@ func TestStore_ConcurrentOverlapFailsTheWholeImport(t *testing.T) {
 		}
 		// Committed from another connection after the import began.
 		e.insertTimedCtx(ctx, me, "2026-02-02", "10:00", "11:00", "pending")
-		return tx.CreateEntry(ctx, importexport.NewEntry{
+		return tx.CreateEntries(ctx, []importexport.NewEntry{{
 			SessionDate: day("2026-02-02"), HasTimes: true, StartMinute: 630, EndMinute: 690, DurationMinutes: 60, CategoryID: cats[0].ID,
-		})
+		}})
 	})
 	if !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("Import() error = %v, want ErrConflict", err)
@@ -484,5 +484,48 @@ func TestStore_ImportsTheRowLimit(t *testing.T) {
 	again := e.importAs(me, text)
 	if again.ImportedCount != 0 || len(again.SkippedRows) != importexport.MaxRows {
 		t.Fatalf("re-import: imported %d skipped %d", again.ImportedCount, len(again.SkippedRows))
+	}
+}
+
+// The batched insert keeps the database's own rules: a client that belongs to another user is refused
+// by the composite foreign key, and the whole import stores nothing.
+func TestStore_CreateEntriesRefusesAnotherUsersClient(t *testing.T) {
+	e := newEnv(t)
+	me := e.user("trainee@example.test")
+	other := e.user("other@example.test")
+	var foreign string
+	if err := e.conn.QueryRow(t.Context(), `INSERT INTO clients (user_id, name) VALUES ($1, 'Pseudonym Z') RETURNING id::text`, other.ID).Scan(&foreign); err != nil {
+		t.Fatal(err)
+	}
+	err := e.store.Import(t.Context(), me.ID, func(ctx context.Context, tx importexport.Tx) error {
+		cats, err := tx.Categories(ctx)
+		if err != nil {
+			return err
+		}
+		return tx.CreateEntries(ctx, []importexport.NewEntry{
+			{SessionDate: day("2026-01-05"), DurationMinutes: 60, CategoryID: cats[0].ID},
+			{SessionDate: day("2026-01-06"), DurationMinutes: 60, CategoryID: cats[0].ID, ClientIDs: []string{foreign}},
+		})
+	})
+	if err == nil {
+		t.Fatal("Import() succeeded with another user's client")
+	}
+	if errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("Import() error = %v, want a plain failure, not a retryable conflict", err)
+	}
+	if e.entryCount(me) != 0 {
+		t.Fatal("a failed batch left entries behind")
+	}
+}
+
+// An empty batch is a no-op, which is what a file whose rows were all skipped produces.
+func TestStore_CreateEntriesWithNothingStoresNothing(t *testing.T) {
+	e := newEnv(t)
+	me := e.user("trainee@example.test")
+	err := e.store.Import(t.Context(), me.ID, func(ctx context.Context, tx importexport.Tx) error {
+		return tx.CreateEntries(ctx, nil)
+	})
+	if err != nil || e.entryCount(me) != 0 {
+		t.Fatalf("Import() error = %v, entries = %d", err, e.entryCount(me))
 	}
 }

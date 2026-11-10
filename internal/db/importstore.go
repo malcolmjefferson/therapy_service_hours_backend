@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"time"
@@ -118,39 +119,80 @@ func (t *importTx) EntriesBetween(ctx context.Context, first, last time.Time) ([
 	return out, nil
 }
 
-// CreateEntry inserts the entry and its client links. An overlap can only come from a request that
-// committed after EntriesBetween read the day; it fails the import with a conflict, which the caller
-// may retry (409 in api/openapi.yaml).
-func (t *importTx) CreateEntry(ctx context.Context, e importexport.NewEntry) error {
-	category, err := parseUUID(e.CategoryID)
-	if err != nil {
-		return fmt.Errorf("category id: %w", err)
+// CreateEntries inserts the entries and their client links with two statements, however many rows
+// there are: a per-row insert took one round trip each, which does not fit the API Lambda's timeout
+// for a 5,000-row file (S4-04). An overlap can only come from a request that committed after
+// EntriesBetween read the days; it fails the import with a conflict, which the caller may retry (409
+// in api/openapi.yaml), and nothing is stored.
+func (t *importTx) CreateEntries(ctx context.Context, entries []importexport.NewEntry) error {
+	if len(entries) == 0 {
+		return nil
 	}
-	clients := make([]pgtype.UUID, 0, len(e.ClientIDs))
-	for _, raw := range e.ClientIDs {
-		id, err := parseUUID(raw)
+	n := len(entries)
+	entryParams := lq.InsertImportedEntriesParams{
+		UserID: t.owner, Ids: make([]pgtype.UUID, 0, n), SessionDates: make([]pgtype.Date, 0, n),
+		StartTimes: make([]pgtype.Time, 0, n), EndTimes: make([]pgtype.Time, 0, n),
+		DurationMinutes: make([]int32, 0, n), CategoryIds: make([]pgtype.UUID, 0, n),
+		OnSites: make([]bool, 0, n), Notes: make([]string, 0, n),
+	}
+	linkParams := lq.InsertImportedEntryClientsParams{UserID: t.owner}
+	for _, e := range entries {
+		category, err := parseUUID(e.CategoryID)
 		if err != nil {
-			return fmt.Errorf("client id: %w", err)
+			return fmt.Errorf("category id: %w", err)
 		}
-		clients = append(clients, id)
+		id, err := newUUID()
+		if err != nil {
+			return err
+		}
+		var start, end pgtype.Time // Invalid (NULL) for an entry that needs a time.
+		if e.HasTimes {
+			start, end = minuteOfDay(e.StartMinute), minuteOfDay(e.EndMinute)
+		}
+		entryParams.Ids = append(entryParams.Ids, id)
+		entryParams.SessionDates = append(entryParams.SessionDates, pgtype.Date{Time: e.SessionDate, Valid: true})
+		entryParams.StartTimes = append(entryParams.StartTimes, start)
+		entryParams.EndTimes = append(entryParams.EndTimes, end)
+		entryParams.DurationMinutes = append(entryParams.DurationMinutes, e.DurationMinutes)
+		entryParams.CategoryIds = append(entryParams.CategoryIds, category)
+		entryParams.OnSites = append(entryParams.OnSites, e.OnSite)
+		entryParams.Notes = append(entryParams.Notes, e.Notes)
+		for _, raw := range e.ClientIDs {
+			client, err := parseUUID(raw)
+			if err != nil {
+				return fmt.Errorf("client id: %w", err)
+			}
+			linkParams.EntryIds = append(linkParams.EntryIds, id)
+			linkParams.ClientIds = append(linkParams.ClientIds, client)
+		}
 	}
-	params := lq.InsertEntryParams{
-		UserID: t.owner, SessionDate: pgtype.Date{Time: e.SessionDate, Valid: true},
-		DurationMinutes: e.DurationMinutes, CategoryID: category, OnSite: e.OnSite,
-		Notes: pgtype.Text{String: e.Notes, Valid: e.Notes != ""},
-	}
-	if e.HasTimes {
-		params.StartTime, params.EndTime = minuteOfDay(e.StartMinute), minuteOfDay(e.EndMinute)
-	}
-	row, err := t.q.InsertEntry(ctx, params)
-	if err != nil {
+	if err := t.q.InsertImportedEntries(ctx, entryParams); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgOverlap && pgErr.ConstraintName == entryOverlapConstraint {
-			return fmt.Errorf("insert entry: %w", errors.Join(domain.ErrConflict, err))
+			return fmt.Errorf("insert entries: %w", errors.Join(domain.ErrConflict, err))
 		}
-		return fmt.Errorf("insert entry: %w", err)
+		return fmt.Errorf("insert entries: %w", err)
 	}
-	return attachClients(ctx, t.q, t.owner, row.ID, clients)
+	if len(linkParams.EntryIds) == 0 {
+		return nil
+	}
+	if err := t.q.InsertImportedEntryClients(ctx, linkParams); err != nil {
+		return fmt.Errorf("attach entry clients: %w", err)
+	}
+	return nil
+}
+
+// newUUID returns a random (version 4) UUID, so a whole file's entries can be named before they are
+// stored and their client links can refer to them in the next statement.
+func newUUID() (pgtype.UUID, error) {
+	var id pgtype.UUID
+	if _, err := rand.Read(id.Bytes[:]); err != nil {
+		return pgtype.UUID{}, fmt.Errorf("generate entry id: %w", err)
+	}
+	id.Bytes[6] = id.Bytes[6]&0x0f | 0x40 // Version 4.
+	id.Bytes[8] = id.Bytes[8]&0x3f | 0x80 // RFC 4122 variant.
+	id.Valid = true
+	return id, nil
 }
 
 // minuteOf is the minutes after midnight of a time column.

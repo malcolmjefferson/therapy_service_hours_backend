@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -170,15 +173,52 @@ func settleContext(parent context.Context) (context.Context, context.CancelFunc)
 }
 
 // requestHash identifies a request: method, path and the body with its members in canonical order,
-// so a retry that re-serializes the same JSON still matches. Keys and other headers are not part of it.
+// so a retry that re-serializes the same JSON still matches. A multipart upload is hashed by its
+// parts' names and contents, not its bytes, because a client picks a new boundary for every attempt.
+// Keys and other headers are not part of it.
 func requestHash(r *http.Request, body []byte) []byte {
 	h := sha256.New()
 	h.Write([]byte(r.Method))
 	h.Write([]byte{0})
 	h.Write([]byte(r.URL.Path))
 	h.Write([]byte{0})
-	h.Write(canonicalJSON(body))
+	if parts, ok := multipartDigest(r.Header.Get("Content-Type"), body); ok {
+		h.Write(parts)
+	} else {
+		h.Write(canonicalJSON(body))
+	}
 	return h.Sum(nil)
+}
+
+// multipartDigest hashes a multipart/form-data body by what its parts say, in order: each part's
+// name and content, length-prefixed so two bodies cannot be made to agree by moving bytes between
+// parts. Boundaries, part headers and file names are left out. It reports false when the body is not
+// multipart or cannot be read, and the caller then hashes the raw bytes.
+func multipartDigest(contentType string, body []byte) ([]byte, bool) {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || mediaType != "multipart/form-data" || params["boundary"] == "" {
+		return nil, false
+	}
+	mr := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	h := sha256.New()
+	for {
+		part, err := mr.NextPart()
+		if errors.Is(err, io.EOF) {
+			return h.Sum(nil), true
+		}
+		if err != nil {
+			return nil, false
+		}
+		content, err := io.ReadAll(part)
+		if err != nil {
+			return nil, false
+		}
+		name := []byte(part.FormName())
+		_ = binary.Write(h, binary.BigEndian, uint64(len(name)))
+		h.Write(name)
+		_ = binary.Write(h, binary.BigEndian, uint64(len(content)))
+		h.Write(content)
+	}
 }
 
 // canonicalJSON re-encodes body with sorted members. The body was validated as JSON upstream; if it
