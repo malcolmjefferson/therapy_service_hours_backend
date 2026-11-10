@@ -18,7 +18,7 @@ func applySupervisionAsMigrator(t *testing.T, conn *pgx.Conn) {
 	if _, err := conn.Exec(t.Context(), "RESET ROLE; SET ROLE migrator"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"00001_baseline.sql", "00002_identity.sql", "00007_supervision_notifications.sql"} {
+	for _, name := range []string{"00001_baseline.sql", "00002_identity.sql", "00008_supervision_notifications.sql"} {
 		sql, err := migrations.FS.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)

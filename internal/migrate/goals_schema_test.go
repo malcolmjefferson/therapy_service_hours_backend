@@ -139,9 +139,9 @@ func TestGoalsSchema_SeedAndFirstSignInProvisioningGetTheDefaults(t *testing.T) 
 	wantGoals(t, pool, actor.ID, want)
 }
 
-// migrationsUpTo is the embedded migrations through version, so a test can stop at the state of a
-// database before or right after one migration however many later ones exist.
-func migrationsUpTo(t *testing.T, version string) fstest.MapFS {
+// migrationsBelow is the embedded migrations whose file name sorts before cutoff ("00006" is the state of
+// a database before S3-01).
+func migrationsBelow(t *testing.T, cutoff string) fstest.MapFS {
 	t.Helper()
 	before := fstest.MapFS{}
 	entries, err := fs.ReadDir(migrations.FS, ".")
@@ -149,7 +149,7 @@ func migrationsUpTo(t *testing.T, version string) fstest.MapFS {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if e.IsDir() || e.Name()[:len(version)] > version {
+		if e.IsDir() || e.Name() >= cutoff {
 			continue
 		}
 		data, err := fs.ReadFile(migrations.FS, e.Name())
@@ -166,7 +166,7 @@ func TestGoalsSchema_BackfillsUsersThatExistBeforeTheMigration(t *testing.T) {
 	conn := open(t, database)
 	opts := migrate.Options{LockID: 917_005}
 
-	if res := migrate.Run(t.Context(), conn, migrationsUpTo(t, "00005"), opts); res.Status != migrate.StatusOK || res.Version != 5 {
+	if res := migrate.Run(t.Context(), conn, migrationsBelow(t, "00006"), opts); res.Status != migrate.StatusOK || res.Version != 5 {
 		t.Fatalf("migrate to 5 = %+v", res)
 	}
 	check := server.Connect(t, database)
@@ -182,7 +182,7 @@ func TestGoalsSchema_BackfillsUsersThatExistBeforeTheMigration(t *testing.T) {
 		users = append(users, id)
 	}
 
-	if res := migrate.Run(t.Context(), conn, migrationsUpTo(t, "00006"), opts); res.Status != migrate.StatusOK || len(res.Applied) != 1 || res.Version != 6 {
+	if res := migrate.Run(t.Context(), conn, migrationsBelow(t, "00007"), opts); res.Status != migrate.StatusOK || len(res.Applied) != 1 || res.Version != 6 {
 		t.Fatalf("migrate to 6 = %+v", res)
 	}
 	for _, id := range users {
