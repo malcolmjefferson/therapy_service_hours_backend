@@ -292,6 +292,7 @@ Pending ──approve──► Approved (locked) ──revert (reason required)�
 
 - Targets are **per-user editable settings** (the defaults above), not hard-coded.
 - **Approved hours drive progress.** Pending hours show as a lighter segment on the bar. Rejected hours are excluded.
+- **Goals API (S3-03, `internal/service/goals`):** hours are minutes / 60 rounded half up to two decimals; percents are whole numbers rounded **down** and not capped (so a milestone shows only once reached); On-site has no target, so its target and percents are `null`. Setting a target leaves `last_celebrated_percent` unchanged. There is no user id in any goals path, so another user's goals cannot be addressed.
 - Progress bars show tick marks at 25/50/75% and have `role="progressbar"` with readable `aria-valuetext`.
 
 ### 7.3 Milestone celebrations
@@ -377,7 +378,7 @@ Base path `/api/v1`. The bearer credential is the Cognito **ID token**, validate
 |---|---|---|
 | Entries | CRUD on own entries; `POST /entries/{id}/revert-approval` (supervisor) | User / Supervisor |
 | Clients | CRUD on own clients | User |
-| Goals | Get and update own targets; progress summary | User |
+| Goals | `GET /goals/progress` (the four goals with approved and pending hours, percents and the Supervision split); `PUT /goals/{goalType}` sets own target (whole hours 1 to 100000; `on_site` is 400) | User |
 | Import / export | `POST /import/markdown`; export data endpoints | User |
 | Supervisors | `GET /supervisors?search=&page=` (same organization only) | User |
 | Requests | create, cancel, list inbox, accept, decline; `POST /supervision-links/{id}/end` | User / Supervisor / Admin |

@@ -63,6 +63,7 @@ func testDeps(sink *logSink) RouterDeps {
 		}),
 		Clients:     &fakeClients{},
 		Categories:  &fakeCategories{},
+		Goals:       &fakeGoals{},
 		Imports:     &fakeImports{},
 		Idempotency: passthroughIdempotency{},
 	}

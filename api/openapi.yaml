@@ -34,6 +34,8 @@ tags:
     description: The current user's saved clients and groups (pseudonyms or initials only)
   - name: entries
     description: The current user's own hours entries
+  - name: goals
+    description: The current user's goal targets and progress
   - name: import-export
     description: Import of the prototype's Markdown ledger and export of the current user's entries
 paths:
@@ -425,6 +427,65 @@ paths:
           $ref: '#/components/responses/EntryConflict'
         default:
           $ref: '#/components/responses/Problem'
+  /goals/progress:
+    get:
+      operationId: getGoalsProgress
+      tags: [goals]
+      summary: Read the current user's four goals with their progress
+      description: |
+        One card per goal, in display order: Direct Service, Supervision, Total Activity, Total Time
+        On-site (FR-GOAL-01). **Approved** hours drive progress and **pending** hours are the lighter
+        segment; rejected entries are never counted (FR-GOAL-03). Hours are shown to two decimals,
+        rounded half up. Percents are whole numbers rounded **down**, so a milestone is only
+        reported once it is reached, and they are not capped: 108 means 8% over the target. On-site
+        has no target, so its target and percents are `null`. Supervision carries the Group /
+        Individual split (FR-GOAL-05). Only the caller's own goals are ever read.
+      responses:
+        '200':
+          description: The caller's goals and progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalsProgressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+  /goals/{goalType}:
+    parameters:
+      - $ref: '#/components/parameters/GoalType'
+    put:
+      operationId: updateGoalTarget
+      tags: [goals]
+      summary: Set the target of one of the caller's goals
+      description: |
+        Replaces the target, in whole hours (FR-GOAL-02). A target that is not a positive whole
+        number is **400**. Total Time On-site has no target, so `on_site` is **400** with the field
+        `goal_type`. The milestone already celebrated is not changed. Only the caller's own goal can
+        be changed; there is no way to name another user's.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalTargetRequest'
+      responses:
+        '200':
+          description: The goal with its new target.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalTarget'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
   /import/markdown:
     post:
       operationId: importMarkdown
@@ -580,6 +641,13 @@ components:
         type: string
         format: uuid
         maxLength: 36
+    GoalType:
+      name: goalType
+      in: path
+      description: Which goal.
+      required: true
+      schema:
+        $ref: '#/components/schemas/GoalType'
     EntryId:
       name: entryId
       in: path
@@ -1131,6 +1199,113 @@ components:
           description: Invalid fields, for validation problems only.
           items:
             $ref: '#/components/schemas/ProblemField'
+    GoalType:
+      type: string
+      description: One of the four goals. `on_site` is tracked only and has no target.
+      enum: [direct, supervision, total_activity, on_site]
+    GoalTargetRequest:
+      type: object
+      description: The new target. Unknown fields are rejected.
+      additionalProperties: false
+      required: [target_hours]
+      properties:
+        target_hours:
+          type: integer
+          format: int32
+          description: Whole hours, at least 1.
+          minimum: 1
+          maximum: 100000
+    GoalTarget:
+      type: object
+      additionalProperties: false
+      required: [goal_type, target_hours]
+      properties:
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        target_hours:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100000
+    HoursTotals:
+      type: object
+      additionalProperties: false
+      required: [approved_hours, pending_hours]
+      properties:
+        approved_hours:
+          type: number
+          format: double
+          minimum: 0
+          description: Approved hours, to two decimals.
+        pending_hours:
+          type: number
+          format: double
+          minimum: 0
+          description: Pending hours, to two decimals.
+    SupervisionSplit:
+      type: object
+      description: How the Supervision hours divide between the two supervision categories (FR-GOAL-05).
+      additionalProperties: false
+      required: [group, individual]
+      properties:
+        group:
+          $ref: '#/components/schemas/HoursTotals'
+        individual:
+          $ref: '#/components/schemas/HoursTotals'
+    GoalProgress:
+      type: object
+      additionalProperties: false
+      required: [goal_type, target_hours, approved_hours, pending_hours, approved_percent, pending_percent, last_celebrated_percent]
+      properties:
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        target_hours:
+          type: [integer, 'null']
+          format: int32
+          minimum: 1
+          maximum: 100000
+          description: The target in whole hours; `null` for `on_site`.
+        approved_hours:
+          type: number
+          format: double
+          minimum: 0
+          description: Approved hours toward the goal, to two decimals. Not capped at the target.
+        pending_hours:
+          type: number
+          format: double
+          minimum: 0
+          description: Pending hours toward the goal, to two decimals (the lighter segment).
+        approved_percent:
+          type: [integer, 'null']
+          format: int32
+          minimum: 0
+          description: Approved hours as a whole percent of the target, rounded down and not capped; `null` without a target.
+        pending_percent:
+          type: [integer, 'null']
+          format: int32
+          minimum: 0
+          description: Pending hours as a whole percent of the target, rounded down and not capped; `null` without a target.
+        last_celebrated_percent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+          description: The highest milestone already celebrated (CLAUDE.md §7.3).
+        supervision_split:
+          allOf:
+            - $ref: '#/components/schemas/SupervisionSplit'
+          description: Present only on the `supervision` goal.
+    GoalsProgressResponse:
+      type: object
+      additionalProperties: false
+      required: [goals]
+      properties:
+        goals:
+          type: array
+          maxItems: 4
+          description: The four goals in display order.
+          items:
+            $ref: '#/components/schemas/GoalProgress'
     ProblemField:
       type: object
       additionalProperties: false
