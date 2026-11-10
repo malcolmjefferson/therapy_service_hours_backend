@@ -380,11 +380,11 @@ Base path `/api/v1`. The bearer credential is the Cognito **ID token**, validate
 | Clients | CRUD on own clients | User |
 | Goals | `GET /goals/progress` (the four goals with approved and pending hours, percents and the Supervision split); `PUT /goals/{goalType}` sets own target (whole hours 1 to 100000; `on_site` is 400) | User |
 | Import / export | `POST /import/markdown`; export data endpoints | User |
-| Supervisors | `GET /supervisors?search=&page=` (same organization only) | User |
-| Requests | create, cancel, list inbox, accept, decline; `POST /supervision-links/{id}/end` | User / Supervisor / Admin |
+| Supervisors | `GET /supervisors?search=&page=` (same organization only; search at most 64 characters) | User |
+| Requests | `POST /supervision-links` (request); `GET /supervision-links?role=as_supervisee\|as_supervisor&status=` (own state, inbox); `POST /supervision-links/{id}/cancel\|accept\|decline\|end` (S6-02) | User / Supervisor / Admin |
 | Supervisor | list supervisees; supervisee summary; supervisee entries; approve / reject / bulk approve | Supervisor |
 | Schedules | `GET /schedules/peers?search=`; `GET /schedules/{userId}?weekStart=` (must be a Monday) | User |
-| Notifications | list; mark read; unread count | All |
+| Notifications | `GET /notifications`; `POST /notifications/{id}/read`; `POST /notifications/read-all`; `GET /notifications/unread-count` (S6-02) | All |
 | Admin | organizations CRUD; users create / edit / deactivate / delete; role assignment | Admin |
 
 Observability: `/healthz`, structured JSON logs (`slog`) with request IDs, CloudWatch alarms on errors and 5xx, OpenTelemetry hooks where inexpensive. API Gateway throttling on all routes, with tighter limits on search.
