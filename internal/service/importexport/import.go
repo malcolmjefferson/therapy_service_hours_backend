@@ -103,10 +103,12 @@ type Tx interface {
 	// EntriesBetween returns the user's entries with a session date from first to last, inclusive,
 	// in every status, with the ids of their clients.
 	EntriesBetween(ctx context.Context, first, last time.Time) ([]ExistingEntry, error)
-	// CreateEntry stores a pending entry with its clients. A session that overlaps another
-	// non-rejected one, which only a concurrent request can cause after the service checked,
-	// returns an error that matches domain.ErrConflict.
-	CreateEntry(ctx context.Context, entry NewEntry) error
+	// CreateEntries stores the pending entries with their clients, all or none. It is called once
+	// per import, so the storage can send them in a few statements instead of one round trip per
+	// row, which a 5,000-row file needs to finish before the Lambda times out. A session that
+	// overlaps another non-rejected one, which only a concurrent request can cause after the service
+	// checked, returns an error that matches domain.ErrConflict.
+	CreateEntries(ctx context.Context, entries []NewEntry) error
 }
 
 // Store runs an import's storage work in one transaction.
@@ -189,19 +191,21 @@ func run(ctx context.Context, tx Tx, ledger Ledger) (Report, error) {
 	for _, bad := range ledger.Skipped {
 		report.SkippedRows = append(report.SkippedRows, SkippedRow{Row: bad.Number, Reason: bad.Reason, Field: bad.Field, Message: bad.Message})
 	}
+	accepted := make([]NewEntry, 0, len(ledger.Rows))
 	for _, row := range ledger.Rows {
 		entry, skip := p.accept(row)
 		if skip != nil {
 			report.SkippedRows = append(report.SkippedRows, *skip)
 			continue
 		}
-		if err := tx.CreateEntry(ctx, entry); err != nil {
-			return Report{}, fmt.Errorf("create entry: %w", err)
-		}
+		accepted = append(accepted, entry)
 		report.ImportedCount++
 		if !entry.HasTimes {
 			report.NeedsTimeCount++
 		}
+	}
+	if err := tx.CreateEntries(ctx, accepted); err != nil {
+		return Report{}, fmt.Errorf("create entries: %w", err)
 	}
 	// The parser's skips and ours are interleaved in file order.
 	sort.SliceStable(report.SkippedRows, func(i, j int) bool { return report.SkippedRows[i].Row < report.SkippedRows[j].Row })
