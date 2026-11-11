@@ -11,6 +11,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const approveSeedEntries = `-- name: ApproveSeedEntries :execrows
+UPDATE entries SET status = 'approved', reviewed_at = $1::timestamptz, updated_at = $1::timestamptz
+WHERE status = 'pending'
+  AND user_id = (SELECT id FROM users WHERE email = $2::citext AND email LIKE '%@example.invalid')
+`
+
+type ApproveSeedEntriesParams struct {
+	At    pgtype.Timestamptz
+	Email string
+}
+
+// S3-07: dev-only stand-in for the review workflow (S7). Marks one synthetic test user's pending
+// entries approved. Only @example.invalid accounts qualify, so a real person's entries are never touched.
+func (q *Queries) ApproveSeedEntries(ctx context.Context, arg ApproveSeedEntriesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, approveSeedEntries, arg.At, arg.Email)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const ensureDefaultOrganization = `-- name: EnsureDefaultOrganization :exec
 INSERT INTO organizations (name) VALUES ('Default Organization') ON CONFLICT (name) DO NOTHING
 `

@@ -20,6 +20,10 @@ func (r runner) Run(context.Context, service.Request) (service.Result, error) {
 	return service.Result{AccountsCreated: 1}, r.err
 }
 
+func (r runner) ApproveEntries(context.Context, service.ApproveRequest) (service.ApproveResult, error) {
+	return service.ApproveResult{EntriesApproved: 1}, r.err
+}
+
 func (r runner) VerifyBinding(context.Context, service.BindingRequest) (service.BindingResult, error) {
 	return service.BindingResult{Users: 1, SubjectUsers: 1, MatchingActiveAdmin: 1, AcceptedInvitations: 1}, r.err
 }

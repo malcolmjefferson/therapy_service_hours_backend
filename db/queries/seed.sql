@@ -35,3 +35,10 @@ SELECT
     (SELECT count(*) FROM invitations i JOIN users u ON u.email = i.email AND u.organization_id = i.organization_id
      WHERE u.email = sqlc.arg(email)::citext AND u.cognito_sub = sqlc.arg(subject)::text
        AND i.status = 'accepted' AND i.accepted_at IS NOT NULL) AS accepted_invitations;
+
+-- name: ApproveSeedEntries :execrows
+-- S3-07: dev-only stand-in for the review workflow (S7). Marks one synthetic test user's pending
+-- entries approved. Only @example.invalid accounts qualify, so a real person's entries are never touched.
+UPDATE entries SET status = 'approved', reviewed_at = sqlc.arg(at)::timestamptz, updated_at = sqlc.arg(at)::timestamptz
+WHERE status = 'pending'
+  AND user_id = (SELECT id FROM users WHERE email = sqlc.arg(email)::citext AND email LIKE '%@example.invalid');
